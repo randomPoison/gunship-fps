@@ -1,0 +1,12 @@
+[package]
+
+name = "fps"
+version = "0.0.0"
+authors = ["David LeGare <excaliburhissheath@gmail.com>"]
+
+[[bin]]
+name = "main"
+
+[dependencies.gunship]
+version = "*"
+path = "../render_rs"
