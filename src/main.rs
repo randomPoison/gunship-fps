@@ -1,9 +1,6 @@
-#![feature(core)]
-
 extern crate gunship;
 
 mod bullet;
-mod wav;
 
 use std::f32::consts::PI;
 
@@ -11,32 +8,19 @@ use gunship::*;
 use gunship::ScanCode::*;
 
 use bullet::{Bullet, BulletManager, BulletSystem};
-use wav::Wave;
 
 fn main() {
-    // let max = u16::MAX as f32 * 0.25;
-    // let audio_frequency = 440.0;
-    // let samples_per_second = (48000 * 2) as f32;
-    // let mut data_source =
-    //     (0u64..).map(|sample| sample as f32 / samples_per_second)
-    //             .map(|t| ((t * audio_frequency * 2.0 * ::std::f32::consts::PI).sin() * max) as u16);
-    // // Play some audio.
-    // audio_source.stream(&mut data_source, 2.0);
-
     let mut engine = Engine::new();
 
     engine.register_system(Box::new(BulletSystem));
 
     let (root_entity, camera_entity, gun_entity) = scene_setup(engine.scene_mut());
 
-    let audio_clip = wav::Wave::from_file("audio/Shotgun_Blast-Jim_Rogers-1914772763.wav").unwrap();
-
     engine.register_system(Box::new(PlayerMoveSystem {
         root: root_entity,
         camera: camera_entity,
         gun_entity: gun_entity,
         bullet_offset: Vector3::new(0.0, 0.04, 0.2),
-        audio_clip: audio_clip,
     }));
 
     engine.main_loop();
@@ -54,6 +38,9 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
 
     let mut light_handle = scene.get_manager::<LightManager>();
     let mut light_manager = light_handle.get();
+
+    let mut audio_handle = scene.get_manager::<AudioSourceManager>();
+    let mut audio_manager = audio_handle.get();
 
     // Create light.
     {
@@ -115,6 +102,7 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
         let gun_transform = transform_manager.create(gun_entity);
         gun_transform.set_position(Point::new(0.1, -0.1, -0.3));
         mesh_manager.create(gun_entity, "meshes/gun_small.dae");
+        audio_manager.assign(gun_entity, "audio/Shotgun_Blast-Jim_Rogers-1914772763.wav");
 
         gun_entity
     };
@@ -152,14 +140,10 @@ struct PlayerMoveSystem {
     camera: Entity,
     gun_entity: Entity,
     bullet_offset: Vector3,
-    audio_clip: Wave,
 }
 
 impl System for PlayerMoveSystem {
     fn update(&mut self, scene: &mut Scene, delta: f32) {
-        // Test write audio.
-        scene.audio_source.stream(&mut self.audio_clip.data.samples.iter().map(|sample| *sample), 2.0);
-
         // Cache off the position and rotation and then drop the transform
         // so that we don't have multiple borrows of transform_manager.
         let (position, rotation) = {
@@ -227,6 +211,13 @@ impl System for PlayerMoveSystem {
 
         // Maybe shoot some bullets?
         if scene.input.mouse_button_pressed(0) {
+            let mut audio_handle = scene.get_manager::<AudioSourceManager>();
+            let mut audio_manager = audio_handle.get();
+
+            let mut audio_source = audio_manager.get_mut(self.gun_entity);
+            audio_source.reset();
+            audio_source.play();
+
             let bullet_pos = position
                            + (self.bullet_offset.x * right_dir)
                            + (self.bullet_offset.y * up_dir)
