@@ -1,6 +1,9 @@
+#![feature(core)]
+
 extern crate gunship;
 
 mod bullet;
+mod wav;
 
 use std::f32::consts::PI;
 
@@ -8,24 +11,38 @@ use gunship::*;
 use gunship::ScanCode::*;
 
 use bullet::{Bullet, BulletManager, BulletSystem};
+use wav::Wave;
 
 fn main() {
+    // let max = u16::MAX as f32 * 0.25;
+    // let audio_frequency = 440.0;
+    // let samples_per_second = (48000 * 2) as f32;
+    // let mut data_source =
+    //     (0u64..).map(|sample| sample as f32 / samples_per_second)
+    //             .map(|t| ((t * audio_frequency * 2.0 * ::std::f32::consts::PI).sin() * max) as u16);
+    // // Play some audio.
+    // audio_source.stream(&mut data_source, 2.0);
+
     let mut engine = Engine::new();
 
     engine.register_system(Box::new(BulletSystem));
 
-    let (root_entity, camera_entity) = scene_setup(engine.scene_mut());
+    let (root_entity, camera_entity, gun_entity) = scene_setup(engine.scene_mut());
+
+    let audio_clip = wav::Wave::from_file("audio/Shotgun_Blast-Jim_Rogers-1914772763.wav").unwrap();
 
     engine.register_system(Box::new(PlayerMoveSystem {
         root: root_entity,
         camera: camera_entity,
-        bullet_offset: Vector3::new(0.1, -0.06, 0.3),
+        gun_entity: gun_entity,
+        bullet_offset: Vector3::new(0.0, 0.04, 0.2),
+        audio_clip: audio_clip,
     }));
 
     engine.main_loop();
 }
 
-fn scene_setup(scene: &mut Scene) -> (Entity, Entity) {
+fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
     let mut transform_handle = scene.get_manager::<TransformManager>();
     let mut transform_manager = transform_handle.get();
 
@@ -127,17 +144,22 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity) {
 
     scene.register_manager::<BulletManager>(Box::new(StructComponentManager::new()));
 
-    (root_entity, camera_entity)
+    (root_entity, camera_entity, gun_entity)
 }
 
 struct PlayerMoveSystem {
     root: Entity,
     camera: Entity,
+    gun_entity: Entity,
     bullet_offset: Vector3,
+    audio_clip: Wave,
 }
 
 impl System for PlayerMoveSystem {
     fn update(&mut self, scene: &mut Scene, delta: f32) {
+        // Test write audio.
+        scene.audio_source.stream(&mut self.audio_clip.data.samples.iter().map(|sample| *sample), 2.0);
+
         // Cache off the position and rotation and then drop the transform
         // so that we don't have multiple borrows of transform_manager.
         let (position, rotation) = {
@@ -146,7 +168,7 @@ impl System for PlayerMoveSystem {
 
             let (movement_x, movement_y) = scene.input.mouse_delta();
 
-            let (root_position, root_rotation) = {
+            {
                 let mut root_transform = transform_manager.get_mut(self.root);
                 let position = root_transform.position();
                 let rotation = root_transform.rotation();
@@ -181,8 +203,6 @@ impl System for PlayerMoveSystem {
                 if scene.input.key_down(Q) {
                     root_transform.set_position(position + Vector3::down() * delta);
                 }
-
-                (position, rotation)
             };
 
             {
@@ -195,10 +215,10 @@ impl System for PlayerMoveSystem {
                   * rotation);
             }
 
-            transform_manager.update_single(self.camera);
-            let camera_transform = transform_manager.get(self.camera);
+            transform_manager.update_single(self.gun_entity);
+            let gun_transform = transform_manager.get(self.gun_entity);
 
-            (camera_transform.position_derived(), camera_transform.rotation_derived())
+            (gun_transform.position_derived(), gun_transform.rotation_derived())
         };
 
         let up_dir = rotation.y_part();
