@@ -157,11 +157,11 @@ impl System for PlayerMoveSystem {
                 let position = root_transform.position();
                 let rotation = root_transform.rotation();
 
-                root_transform.set_rotation(Matrix4::rotation(0.0, (-movement_x as f32) * PI * 0.001, 0.0) * rotation);
+                root_transform.set_rotation(Quaternion::from_eulers(0.0, (-movement_x as f32) * PI * 0.001, 0.0) * rotation);
 
                 // Calculate the forward and right vectors.
-                let forward_dir = -root_transform.rotation().z_part();
-                let right_dir = root_transform.rotation().x_part();
+                let forward_dir = -root_transform.rotation().as_matrix().z_part();
+                let right_dir = root_transform.rotation().as_matrix().x_part();
 
                 // Move camera based on input.
                 if scene.input.key_down(W) {
@@ -195,7 +195,7 @@ impl System for PlayerMoveSystem {
 
                 // Apply a rotation to the camera based on mouse movmeent.
                 camera_transform.set_rotation(
-                    Matrix4::rotation((-movement_y as f32) * PI * 0.001, 0.0, 0.0)
+                    Quaternion::from_eulers((-movement_y as f32) * PI * 0.001, 0.0, 0.0)
                   * rotation);
             }
 
@@ -205,9 +205,9 @@ impl System for PlayerMoveSystem {
             (gun_transform.position_derived(), gun_transform.rotation_derived())
         };
 
-        let up_dir = rotation.y_part();
-        let right_dir = rotation.y_part();
-        let forward_dir = -rotation.z_part();
+        let up_dir = rotation.as_matrix().y_part();
+        let right_dir = rotation.as_matrix().y_part();
+        let forward_dir = -rotation.as_matrix().z_part();
 
         // Maybe shoot some bullets?
         if scene.input.mouse_button_pressed(0) {

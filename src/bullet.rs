@@ -5,7 +5,7 @@ pub struct Bullet {
 }
 
 impl Bullet {
-    pub fn new(scene: &mut Scene, position: Point, rotation: Matrix4) -> Entity {
+    pub fn new(scene: &mut Scene, position: Point, rotation: Quaternion) -> Entity {
         let bullet_entity = scene.entity_manager.create();
 
         let mut transform_handle = scene.get_manager::<TransformManager>();
@@ -49,7 +49,7 @@ impl System for BulletSystem {
         for (bullet, entity) in bullet_manager.iter() {
             let transform = transform_manager.get_mut(entity);
             let position = transform.position();
-            let forward = -transform.rotation_matrix().z_part();
+            let forward = -transform.rotation().as_matrix().z_part();
             transform.set_position(position + forward * bullet.speed * delta);
         }
     }
