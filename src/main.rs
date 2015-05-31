@@ -22,6 +22,7 @@ fn main() {
         gun_entity: gun_entity,
         bullet_offset: Vector3::new(0.0, 0.04, 0.2),
     }));
+    engine.register_system(Box::new(GunAnimationSystem));
 
     engine.main_loop();
 }
@@ -131,6 +132,18 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
     }
 
     scene.register_manager::<BulletManager>(Box::new(StructComponentManager::new()));
+    scene.register_manager::<GunAnimationManager>(Box::new(GunAnimationManager::new()));
+
+    // Add gun animation manager to player gun.
+    {
+        let mut gun_anim_handle = scene.get_manager::<GunAnimationManager>();
+        let mut gun_animation_manager = gun_anim_handle.get();
+
+        gun_animation_manager.create(gun_entity, GunAnimation {
+            default_orientation: Quaternion::identity(),
+            desired_orientation: Quaternion::look_rotation(Vector3::new(0.0, 1.0, 0.0), Vector3::new(0.0, 0.0, 1.0)),
+        });
+    }
 
     (root_entity, camera_entity, gun_entity)
 }
@@ -223,6 +236,32 @@ impl System for PlayerMoveSystem {
                            + (self.bullet_offset.y * up_dir)
                            + (self.bullet_offset.z * forward_dir);
             Bullet::new(scene, bullet_pos, rotation);
+        }
+    }
+}
+
+pub struct GunAnimation {
+    pub default_orientation: Quaternion,
+    pub desired_orientation: Quaternion,
+}
+
+pub type GunAnimationManager = StructComponentManager<GunAnimation>;
+
+pub struct GunAnimationSystem;
+
+impl System for GunAnimationSystem {
+    fn update(&mut self, scene: &mut Scene, delta: f32) {
+        let mut transform_handle = scene.get_manager::<TransformManager>();
+        let mut transform_manager = transform_handle.get();
+
+        let mut gun_anim_handle = scene.get_manager::<GunAnimationManager>();
+        let mut gun_animation_manager = gun_anim_handle.get();
+
+        for (gun_animation, entity) in gun_animation_manager.iter_mut() {
+            let transform = transform_manager.get_mut(entity);
+
+            let temp = Quaternion::slerp(transform.rotation(), gun_animation.desired_orientation, 1.0 * delta);
+            transform.set_rotation(temp);
         }
     }
 }
