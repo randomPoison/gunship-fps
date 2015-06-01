@@ -260,7 +260,7 @@ impl System for GunAnimationSystem {
         for (gun_animation, entity) in gun_animation_manager.iter_mut() {
             let transform = transform_manager.get_mut(entity);
 
-            let temp = Quaternion::slerp(transform.rotation(), gun_animation.desired_orientation, 1.0 * delta);
+            let temp = Quaternion::nlerp(transform.rotation(), gun_animation.desired_orientation, 1.0 * delta);
             transform.set_rotation(temp);
         }
     }
