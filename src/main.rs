@@ -151,7 +151,8 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
 
         gun_animation_manager.assign(gun_entity, GunPhysics {
             mass: 1.0,
-            spring_constant: 10.0,
+            spring_constant: 100.0,
+            damping: 10.0,
             velocity: Vector3::zero(),
         });
     }
@@ -263,6 +264,8 @@ pub struct GunPhysics {
     pub mass: f32,
     pub spring_constant: f32,
 
+    pub damping: f32,
+
     /// The current velocity of the simulation in meters per second.
     velocity: Vector3,
 }
@@ -284,10 +287,12 @@ impl System for GunPhysicsSystem {
 
             // Calculate the force based on the offset from equilibrium (the origin).
             let offset = transform.position().as_vector3();
-            let force = -physics.spring_constant * offset.magnitude();
+            let spring = -physics.spring_constant * offset;
+            let damping = -physics.damping * physics.velocity;
+            let force = spring + damping;
 
             // Calculate the resulting acceleration using SCIENCE!
-            let acceleration = offset.normalized() * (force / physics.mass);
+            let acceleration = force / physics.mass;
 
             // Adjust the velocity.
             physics.velocity = physics.velocity + acceleration * delta;
