@@ -26,7 +26,7 @@ impl Bullet {
         let mut bullet_handle = scene.get_manager::<BulletManager>();
         let mut bullet_manager = bullet_handle.get();
 
-        bullet_manager.create(bullet_entity, Bullet {
+        bullet_manager.assign(bullet_entity, Bullet {
             speed: 5.0
         });
 

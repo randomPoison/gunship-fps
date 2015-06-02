@@ -22,7 +22,7 @@ fn main() {
         gun_entity: gun_entity,
         bullet_offset: Vector3::new(0.0, 0.04, 0.2),
     }));
-    engine.register_system(Box::new(GunAnimationSystem));
+    engine.register_system(Box::new(GunPhysicsSystem));
 
     engine.main_loop();
 }
@@ -49,7 +49,7 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
         let transform = transform_manager.create(light_entity);
         transform.set_position(Point::new(-1.0, -1.5, 0.0));
         transform.set_scale(Vector3::new(0.1, 0.1, 0.1));
-        light_manager.create(
+        light_manager.assign(
             light_entity,
             Light::Point(PointLight {
                 position: Point::origin()
@@ -63,7 +63,7 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
         let transform = transform_manager.create(light_entity);
         transform.set_position(Point::new(-1.0, 1.5, 0.0));
         transform.set_scale(Vector3::new(0.1, 0.1, 0.1));
-        light_manager.create(
+        light_manager.assign(
             light_entity,
             Light::Point(PointLight {
                 position: Point::origin()
@@ -83,7 +83,7 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
     let camera_entity = {
         let camera_entity = scene.entity_manager.create();
         transform_manager.create(camera_entity);
-        camera_manager.create(
+        camera_manager.assign(
             camera_entity,
             Camera::new(
                 PI / 3.0,
@@ -97,11 +97,21 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
 
     transform_manager.set_child(root_entity, camera_entity);
 
+    // Create gun root
+    let gun_root = {
+        let gun_root = scene.entity_manager.create();
+        let gun_root_transform = transform_manager.create(gun_root);
+        gun_root_transform.set_position(Point::new(0.1, -0.1, -0.3));
+
+        gun_root
+    };
+    transform_manager.set_child(camera_entity, gun_root);
+
     // Create gun mesh.
     let gun_entity = {
         let gun_entity = scene.entity_manager.create();
-        let gun_transform = transform_manager.create(gun_entity);
-        gun_transform.set_position(Point::new(0.1, -0.1, -0.3));
+        transform_manager.create(gun_entity);
+
         mesh_manager.create(gun_entity, "meshes/gun_small.dae");
         audio_manager.assign(gun_entity, "audio/Shotgun_Blast-Jim_Rogers-1914772763.wav");
 
@@ -110,7 +120,7 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
     println!("gun entity: {:?}", gun_entity);
 
     // Make gun a child of the camera.
-    transform_manager.set_child(camera_entity, gun_entity);
+    transform_manager.set_child(gun_root, gun_entity);
 
     // Create static gun and bullet meshes.
     {
@@ -132,16 +142,17 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
     }
 
     scene.register_manager::<BulletManager>(Box::new(StructComponentManager::new()));
-    scene.register_manager::<GunAnimationManager>(Box::new(GunAnimationManager::new()));
+    scene.register_manager::<GunPhysicsManager>(Box::new(GunPhysicsManager::new()));
 
     // Add gun animation manager to player gun.
     {
-        let mut gun_anim_handle = scene.get_manager::<GunAnimationManager>();
+        let mut gun_anim_handle = scene.get_manager::<GunPhysicsManager>();
         let mut gun_animation_manager = gun_anim_handle.get();
 
-        gun_animation_manager.create(gun_entity, GunAnimation {
-            default_orientation: Quaternion::identity(),
-            desired_orientation: Quaternion::look_rotation(Vector3::new(0.0, 1.0, 0.0), Vector3::new(0.0, 0.0, 1.0)),
+        gun_animation_manager.assign(gun_entity, GunPhysics {
+            mass: 1.0,
+            spring_constant: 10.0,
+            velocity: Vector3::zero(),
         });
     }
 
@@ -227,6 +238,9 @@ impl System for PlayerMoveSystem {
             let mut audio_handle = scene.get_manager::<AudioSourceManager>();
             let mut audio_manager = audio_handle.get();
 
+            let mut gun_anim_handle = scene.get_manager::<GunPhysicsManager>();
+            let mut gun_animation_manager = gun_anim_handle.get();
+
             let mut audio_source = audio_manager.get_mut(self.gun_entity);
             audio_source.reset();
             audio_source.play();
@@ -236,32 +250,50 @@ impl System for PlayerMoveSystem {
                            + (self.bullet_offset.y * up_dir)
                            + (self.bullet_offset.z * forward_dir);
             Bullet::new(scene, bullet_pos, rotation);
+
+            let physics = gun_animation_manager.get_mut(self.gun_entity);
+            physics.velocity = physics.velocity + Vector3::new(0.0, 0.0, 0.5);
         }
     }
 }
 
-pub struct GunAnimation {
-    pub default_orientation: Quaternion,
-    pub desired_orientation: Quaternion,
+#[derive(Debug)]
+pub struct GunPhysics {
+    /// Mass in kilograms. Not a measure of anything specific, just used for the simulation.
+    pub mass: f32,
+    pub spring_constant: f32,
+
+    /// The current velocity of the simulation in meters per second.
+    velocity: Vector3,
 }
 
-pub type GunAnimationManager = StructComponentManager<GunAnimation>;
+pub type GunPhysicsManager = StructComponentManager<GunPhysics>;
 
-pub struct GunAnimationSystem;
+pub struct GunPhysicsSystem;
 
-impl System for GunAnimationSystem {
+impl System for GunPhysicsSystem {
     fn update(&mut self, scene: &mut Scene, delta: f32) {
         let mut transform_handle = scene.get_manager::<TransformManager>();
         let mut transform_manager = transform_handle.get();
 
-        let mut gun_anim_handle = scene.get_manager::<GunAnimationManager>();
+        let mut gun_anim_handle = scene.get_manager::<GunPhysicsManager>();
         let mut gun_animation_manager = gun_anim_handle.get();
 
-        for (gun_animation, entity) in gun_animation_manager.iter_mut() {
+        for (physics, entity) in gun_animation_manager.iter_mut() {
             let transform = transform_manager.get_mut(entity);
 
-            let temp = Quaternion::nlerp(transform.rotation(), gun_animation.desired_orientation, 1.0 * delta);
-            transform.set_rotation(temp);
+            // Calculate the force based on the offset from equilibrium (the origin).
+            let offset = transform.position().as_vector3();
+            let force = -physics.spring_constant * offset.magnitude();
+
+            // Calculate the resulting acceleration using SCIENCE!
+            let acceleration = offset.normalized() * (force / physics.mass);
+
+            // Adjust the velocity.
+            physics.velocity = physics.velocity + acceleration * delta;
+
+            // Update the position.
+            transform.translate(physics.velocity * delta);
         }
     }
 }
