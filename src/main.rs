@@ -151,9 +151,16 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
 
         gun_animation_manager.assign(gun_entity, GunPhysics {
             mass: 1.0,
+            rotational_inertia: 1.0,
+
             spring_constant: 100.0,
+            angular_spring: 200.0,
+
             damping: 10.0,
+            angular_damping: 20.0,
+
             velocity: Vector3::zero(),
+            angular_velocity: Vector3::zero(),
         });
     }
 
@@ -253,7 +260,7 @@ impl System for PlayerMoveSystem {
             Bullet::new(scene, bullet_pos, rotation);
 
             let physics = gun_animation_manager.get_mut(self.gun_entity);
-            physics.velocity = physics.velocity + Vector3::new(0.0, 0.0, 0.5);
+            physics.deflect(Vector3::new(0.0, 0.5, 1.5), Vector3::new(5.0 * PI, -1.5 * PI, 1.5 * PI));
         }
     }
 }
@@ -262,12 +269,26 @@ impl System for PlayerMoveSystem {
 pub struct GunPhysics {
     /// Mass in kilograms. Not a measure of anything specific, just used for the simulation.
     pub mass: f32,
+    pub rotational_inertia: f32,
+
     pub spring_constant: f32,
+    pub angular_spring: f32,
 
     pub damping: f32,
+    pub angular_damping: f32,
 
     /// The current velocity of the simulation in meters per second.
     velocity: Vector3,
+
+    /// Euler angles.
+    angular_velocity: Vector3,
+}
+
+impl GunPhysics {
+    pub fn deflect(&mut self, velocity: Vector3, angular_velocity: Vector3) {
+        self.velocity = self.velocity + velocity;
+        self.angular_velocity = self.angular_velocity + angular_velocity;
+    }
 }
 
 pub type GunPhysicsManager = StructComponentManager<GunPhysics>;
@@ -293,12 +314,22 @@ impl System for GunPhysicsSystem {
 
             // Calculate the resulting acceleration using SCIENCE!
             let acceleration = force / physics.mass;
-
-            // Adjust the velocity.
             physics.velocity = physics.velocity + acceleration * delta;
 
             // Update the position.
             transform.translate(physics.velocity * delta);
+
+            // Calculate torque.
+            let angular_offset = transform.rotation().as_eulers();
+            let spring_torque = -physics.angular_spring * angular_offset;
+            let damping_torque = -physics.angular_damping * physics.angular_velocity;
+            let torque = spring_torque + damping_torque;
+
+            let angular_acceleration = torque / physics.rotational_inertia;
+            physics.angular_velocity = physics.angular_velocity + angular_acceleration * delta;
+
+            let temp = physics.angular_velocity * delta;
+            transform.rotate(Quaternion::from_eulers(temp.x, temp.y, temp.z));
         }
     }
 }
