@@ -9,4 +9,4 @@ name = "main"
 
 [dependencies.gunship]
 version = "*"
-path = "../render_rs"
+path = "../gunship-rs"
