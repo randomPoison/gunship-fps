@@ -12,68 +12,53 @@ use bullet::{Bullet, BulletManager, BulletSystem};
 fn main() {
     let mut engine = Engine::new();
 
-    engine.register_system(Box::new(BulletSystem));
-
     let (root_entity, camera_entity, gun_entity) = scene_setup(engine.scene_mut());
 
-    engine.register_system(Box::new(PlayerMoveSystem {
+    engine.register_system(PlayerMoveSystem {
         root: root_entity,
         camera: camera_entity,
         gun_entity: gun_entity,
         bullet_offset: Vector3::new(0.0, 0.04, 0.2),
-    }));
-    engine.register_system(Box::new(GunPhysicsSystem));
+    });
+    engine.register_system(GunPhysicsSystem);
+    engine.register_system(BulletSystem);
 
     engine.main_loop();
 }
 
 fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
-    let mut transform_handle = scene.get_manager::<TransformManager>();
-    let mut transform_manager = transform_handle.get();
+    scene.register_manager(BulletManager::new());
+    scene.register_manager(GunPhysicsManager::new());
 
-    let mut mesh_handle = scene.get_manager::<MeshManager>();
-    let mut mesh_manager = mesh_handle.get();
+    fn create_light(scene: &Scene, position: Point) -> Entity {
+        let mut transform_manager = scene.get_manager_mut::<TransformManager>();
+        let mut light_manager = scene.get_manager_mut::<LightManager>();
+        let mut mesh_manager = scene.get_manager_mut::<MeshManager>();
 
-    let mut camera_handle = scene.get_manager::<CameraManager>();
-    let mut camera_manager = camera_handle.get();
-
-    let mut light_handle = scene.get_manager::<LightManager>();
-    let mut light_manager = light_handle.get();
-
-    let mut audio_handle = scene.get_manager::<AudioSourceManager>();
-    let mut audio_manager = audio_handle.get();
-
-    // Create light.
-    {
-        let light_entity = scene.entity_manager.create();
-        let transform = transform_manager.create(light_entity);
-        transform.set_position(Point::new(-1.0, -1.5, 0.0));
+        let light_entity = scene.create_entity();
+        let mut transform = transform_manager.assign(light_entity);
+        transform.set_position(position);
         transform.set_scale(Vector3::new(0.1, 0.1, 0.1));
         light_manager.assign(
             light_entity,
             Light::Point(PointLight {
                 position: Point::origin()
             }));
-        mesh_manager.create(light_entity, "meshes/cube.dae");
-    }
+        mesh_manager.assign(light_entity, "meshes/cube.dae");
 
-    // Create light.
-    {
-        let light_entity = scene.entity_manager.create();
-        let transform = transform_manager.create(light_entity);
-        transform.set_position(Point::new(-1.0, 1.5, 0.0));
-        transform.set_scale(Vector3::new(0.1, 0.1, 0.1));
-        light_manager.assign(
-            light_entity,
-            Light::Point(PointLight {
-                position: Point::origin()
-            }));
-        mesh_manager.create(light_entity, "meshes/cube.dae");
-    }
+        light_entity
+    };
+    create_light(scene, Point::new(-1.0, -1.5, 0.0));
+    create_light(scene, Point::new(-1.0, 1.5, 0.0));
+
+    let mut transform_manager = scene.get_manager_mut::<TransformManager>();
+    let mut mesh_manager = scene.get_manager_mut::<MeshManager>();
+    let mut camera_manager = scene.get_manager_mut::<CameraManager>();
+    let mut audio_manager = scene.get_manager_mut::<AudioSourceManager>();
 
     let root_entity = {
-        let entity = scene.entity_manager.create();
-        let transform = transform_manager.create(entity);
+        let entity = scene.create_entity();
+        let mut transform = transform_manager.assign(entity);
         transform.set_position(Point::new(0.0, 0.0, 0.0));
         entity
     };
@@ -81,8 +66,8 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
 
     // Create camera.
     let camera_entity = {
-        let camera_entity = scene.entity_manager.create();
-        transform_manager.create(camera_entity);
+        let camera_entity = scene.create_entity();
+        transform_manager.assign(camera_entity);
         camera_manager.assign(
             camera_entity,
             Camera::new(
@@ -99,8 +84,8 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
 
     // Create gun root
     let gun_root = {
-        let gun_root = scene.entity_manager.create();
-        let gun_root_transform = transform_manager.create(gun_root);
+        let gun_root = scene.create_entity();
+        let mut gun_root_transform = transform_manager.assign(gun_root);
         gun_root_transform.set_position(Point::new(0.1, -0.1, -0.3));
 
         gun_root
@@ -109,10 +94,10 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
 
     // Create gun mesh.
     let gun_entity = {
-        let gun_entity = scene.entity_manager.create();
-        transform_manager.create(gun_entity);
+        let gun_entity = scene.create_entity();
+        transform_manager.assign(gun_entity);
 
-        mesh_manager.create(gun_entity, "meshes/gun_small.dae");
+        mesh_manager.assign(gun_entity, "meshes/gun_small.dae");
         audio_manager.assign(gun_entity, "audio/Shotgun_Blast-Jim_Rogers-1914772763.wav");
 
         gun_entity
@@ -124,40 +109,36 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
 
     // Create static gun and bullet meshes.
     {
-        let static_gun_entity = scene.entity_manager.create();
-        let static_bullet_entity = scene.entity_manager.create();
+        let static_gun_entity = scene.create_entity();
+        let static_bullet_entity = scene.create_entity();
 
         {
-            let gun_transform = transform_manager.create(static_gun_entity);
+            let mut gun_transform = transform_manager.assign(static_gun_entity);
             gun_transform.set_position(Point::new(0.0, 0.0, -1.0));
         }
 
         {
-            let bullet_transform = transform_manager.create(static_bullet_entity);
+            let mut bullet_transform = transform_manager.assign(static_bullet_entity);
             bullet_transform.set_position(Point::new(-1.0, 0.0, 0.0));
         }
 
-        mesh_manager.create(static_gun_entity, "meshes/gun_small.dae");
-        mesh_manager.create(static_bullet_entity, "meshes/cube.dae");
+        mesh_manager.assign(static_gun_entity, "meshes/gun_small.dae");
+        mesh_manager.assign(static_bullet_entity, "meshes/cube.dae");
     }
-
-    scene.register_manager::<BulletManager>(Box::new(StructComponentManager::new()));
-    scene.register_manager::<GunPhysicsManager>(Box::new(GunPhysicsManager::new()));
 
     // Add gun animation manager to player gun.
     {
-        let mut gun_anim_handle = scene.get_manager::<GunPhysicsManager>();
-        let mut gun_animation_manager = gun_anim_handle.get();
+        let mut gun_animation_manager = scene.get_manager_mut::<GunPhysicsManager>();
 
         gun_animation_manager.assign(gun_entity, GunPhysics {
             mass: 1.0,
             rotational_inertia: 1.0,
 
-            spring_constant: 100.0,
-            angular_spring: 200.0,
+            spring_constant: 500.0,
+            angular_spring: 400.0,
 
             damping: 10.0,
-            angular_damping: 20.0,
+            angular_damping: 10.0,
 
             velocity: Vector3::zero(),
             angular_velocity: Vector3::zero(),
@@ -167,6 +148,7 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
     (root_entity, camera_entity, gun_entity)
 }
 
+#[derive(Debug, Clone, Copy)]
 struct PlayerMoveSystem {
     root: Entity,
     camera: Entity,
@@ -179,8 +161,7 @@ impl System for PlayerMoveSystem {
         // Cache off the position and rotation and then drop the transform
         // so that we don't have multiple borrows of transform_manager.
         let (position, rotation) = {
-            let mut transform_handle = scene.get_manager::<TransformManager>();
-            let mut transform_manager = transform_handle.get();
+            let transform_manager = scene.get_manager::<TransformManager>();
 
             let (movement_x, movement_y) = scene.input.mouse_delta();
 
@@ -222,7 +203,7 @@ impl System for PlayerMoveSystem {
             };
 
             {
-                let camera_transform = transform_manager.get_mut(self.camera);
+                let mut camera_transform = transform_manager.get_mut(self.camera);
                 let rotation = camera_transform.rotation();
 
                 // Apply a rotation to the camera based on mouse movmeent.
@@ -243,11 +224,8 @@ impl System for PlayerMoveSystem {
 
         // Maybe shoot some bullets?
         if scene.input.mouse_button_pressed(0) {
-            let mut audio_handle = scene.get_manager::<AudioSourceManager>();
-            let mut audio_manager = audio_handle.get();
-
-            let mut gun_anim_handle = scene.get_manager::<GunPhysicsManager>();
-            let mut gun_animation_manager = gun_anim_handle.get();
+            let audio_manager = scene.get_manager::<AudioSourceManager>();
+            let gun_animation_manager = scene.get_manager::<GunPhysicsManager>();
 
             let mut audio_source = audio_manager.get_mut(self.gun_entity);
             audio_source.reset();
@@ -259,13 +237,13 @@ impl System for PlayerMoveSystem {
                            + (self.bullet_offset.z * forward_dir);
             Bullet::new(scene, bullet_pos, rotation);
 
-            let physics = gun_animation_manager.get_mut(self.gun_entity);
-            physics.deflect(Vector3::new(0.0, 0.5, 1.5), Vector3::new(5.0 * PI, -1.5 * PI, 1.5 * PI));
+            let mut physics = gun_animation_manager.get_mut(self.gun_entity);
+            physics.deflect(Vector3::new(0.0, 3.0, 5.0), Vector3::new(15.0 * PI, -8.0 * PI, 5.0 * PI));
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct GunPhysics {
     /// Mass in kilograms. Not a measure of anything specific, just used for the simulation.
     pub mass: f32,
@@ -297,14 +275,11 @@ pub struct GunPhysicsSystem;
 
 impl System for GunPhysicsSystem {
     fn update(&mut self, scene: &mut Scene, delta: f32) {
-        let mut transform_handle = scene.get_manager::<TransformManager>();
-        let mut transform_manager = transform_handle.get();
+        let transform_manager = scene.get_manager::<TransformManager>();
+        let gun_animation_manager = scene.get_manager::<GunPhysicsManager>();
 
-        let mut gun_anim_handle = scene.get_manager::<GunPhysicsManager>();
-        let mut gun_animation_manager = gun_anim_handle.get();
-
-        for (physics, entity) in gun_animation_manager.iter_mut() {
-            let transform = transform_manager.get_mut(entity);
+        for (mut physics, entity) in gun_animation_manager.iter_mut() {
+            let mut transform = transform_manager.get_mut(entity);
 
             // Calculate the force based on the offset from equilibrium (the origin).
             let offset = transform.position().as_vector3();
