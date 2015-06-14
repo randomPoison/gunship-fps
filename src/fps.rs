@@ -9,8 +9,16 @@ use gunship::ScanCode::*;
 
 use bullet::{Bullet, BulletManager, BulletSystem};
 
-fn main() {
-    let mut engine = Engine::new();
+// fn main() {
+//     let mut engine = Engine::new();
+//     game_init(&mut engine);
+//     engine.main_loop();
+// }
+
+#[no_mangle]
+pub fn game_init(engine: &mut Engine) {
+    engine.scene_mut().register_manager(BulletManager::new());
+    engine.scene_mut().register_manager(GunPhysicsManager::new());
 
     let (root_entity, camera_entity, gun_entity) = scene_setup(engine.scene_mut());
 
@@ -22,13 +30,19 @@ fn main() {
     });
     engine.register_system(GunPhysicsSystem);
     engine.register_system(BulletSystem);
+}
 
-    engine.main_loop();
+#[no_mangle]
+pub fn game_reload(old_engine: &Engine, engine: &mut Engine) {
+    engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<BulletManager>().clone());
+    engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<GunPhysicsManager>().clone());
+
+    engine.register_system(BulletSystem);
+    engine.register_system(GunPhysicsSystem);
+    engine.register_system(old_engine.get_system_by_name::<PlayerMoveSystem>().clone());
 }
 
 fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
-    scene.register_manager(BulletManager::new());
-    scene.register_manager(GunPhysicsManager::new());
 
     fn create_light(scene: &Scene, position: Point) -> Entity {
         let mut transform_manager = scene.get_manager_mut::<TransformManager>();
@@ -238,7 +252,7 @@ impl System for PlayerMoveSystem {
             Bullet::new(scene, bullet_pos, rotation);
 
             let mut physics = gun_animation_manager.get_mut(self.gun_entity);
-            physics.deflect(Vector3::new(0.0, 3.0, 5.0), Vector3::new(15.0 * PI, -8.0 * PI, 5.0 * PI));
+            physics.deflect(Vector3::new(0.0, 3.0, 10.0), Vector3::new(15.0 * PI, -8.0 * PI, 5.0 * PI));
         }
     }
 }
@@ -275,6 +289,20 @@ pub struct GunPhysicsSystem;
 
 impl System for GunPhysicsSystem {
     fn update(&mut self, scene: &mut Scene, delta: f32) {
+        let test_physics = GunPhysics {
+            mass: 1.0,
+            rotational_inertia: 1.0,
+
+            spring_constant: 500.0,
+            angular_spring: 400.0,
+
+            damping: 20.0,
+            angular_damping: 20.0,
+
+            velocity: Vector3::zero(),
+            angular_velocity: Vector3::zero(),
+        };
+
         let transform_manager = scene.get_manager::<TransformManager>();
         let gun_animation_manager = scene.get_manager::<GunPhysicsManager>();
 
@@ -283,12 +311,12 @@ impl System for GunPhysicsSystem {
 
             // Calculate the force based on the offset from equilibrium (the origin).
             let offset = transform.position().as_vector3();
-            let spring = -physics.spring_constant * offset;
-            let damping = -physics.damping * physics.velocity;
+            let spring = -test_physics.spring_constant * offset;
+            let damping = -test_physics.damping * physics.velocity;
             let force = spring + damping;
 
             // Calculate the resulting acceleration using SCIENCE!
-            let acceleration = force / physics.mass;
+            let acceleration = force / test_physics.mass;
             physics.velocity = physics.velocity + acceleration * delta;
 
             // Update the position.
@@ -296,11 +324,11 @@ impl System for GunPhysicsSystem {
 
             // Calculate torque.
             let angular_offset = transform.rotation().as_eulers();
-            let spring_torque = -physics.angular_spring * angular_offset;
-            let damping_torque = -physics.angular_damping * physics.angular_velocity;
+            let spring_torque = -test_physics.angular_spring * angular_offset;
+            let damping_torque = -test_physics.angular_damping * physics.angular_velocity;
             let torque = spring_torque + damping_torque;
 
-            let angular_acceleration = torque / physics.rotational_inertia;
+            let angular_acceleration = torque / test_physics.rotational_inertia;
             physics.angular_velocity = physics.angular_velocity + angular_acceleration * delta;
 
             let temp = physics.angular_velocity * delta;
