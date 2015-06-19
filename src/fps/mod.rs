@@ -1,24 +1,19 @@
-extern crate gunship;
-
 mod bullet;
+mod physics;
 
 use std::f32::consts::PI;
 
 use gunship::*;
 use gunship::ScanCode::*;
 
-use bullet::{Bullet, BulletManager, BulletSystem};
-
-// fn main() {
-//     let mut engine = Engine::new();
-//     game_init(&mut engine);
-//     engine.main_loop();
-// }
+use self::bullet::*;
+use self::physics::*;
 
 #[no_mangle]
 pub fn game_init(engine: &mut Engine) {
     engine.scene_mut().register_manager(BulletManager::new());
     engine.scene_mut().register_manager(GunPhysicsManager::new());
+    engine.scene_mut().register_manager(RigidbodyManager::new());
 
     let (root_entity, camera_entity, gun_entity) = scene_setup(engine.scene_mut());
 
@@ -143,6 +138,7 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
     // Add gun animation manager to player gun.
     {
         let mut gun_animation_manager = scene.get_manager_mut::<GunPhysicsManager>();
+        let mut rigidbody_manager = scene.get_manager_mut::<RigidbodyManager>();
 
         gun_animation_manager.assign(gun_entity, GunPhysics {
             mass: 1.0,
@@ -153,10 +149,8 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
 
             damping: 10.0,
             angular_damping: 10.0,
-
-            velocity: Vector3::zero(),
-            angular_velocity: Vector3::zero(),
         });
+        rigidbody_manager.assign(gun_entity, Rigidbody::new());
     }
 
     (root_entity, camera_entity, gun_entity)
@@ -239,7 +233,7 @@ impl System for PlayerMoveSystem {
         // Maybe shoot some bullets?
         if scene.input.mouse_button_pressed(0) {
             let audio_manager = scene.get_manager::<AudioSourceManager>();
-            let gun_animation_manager = scene.get_manager::<GunPhysicsManager>();
+            let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
 
             let mut audio_source = audio_manager.get_mut(self.gun_entity);
             audio_source.reset();
@@ -251,88 +245,9 @@ impl System for PlayerMoveSystem {
                            + (self.bullet_offset.z * forward_dir);
             Bullet::new(scene, bullet_pos, rotation);
 
-            let mut physics = gun_animation_manager.get_mut(self.gun_entity);
-            physics.deflect(Vector3::new(0.0, 3.0, 10.0), Vector3::new(15.0 * PI, -8.0 * PI, 5.0 * PI));
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct GunPhysics {
-    /// Mass in kilograms. Not a measure of anything specific, just used for the simulation.
-    pub mass: f32,
-    pub rotational_inertia: f32,
-
-    pub spring_constant: f32,
-    pub angular_spring: f32,
-
-    pub damping: f32,
-    pub angular_damping: f32,
-
-    /// The current velocity of the simulation in meters per second.
-    velocity: Vector3,
-
-    /// Euler angles.
-    angular_velocity: Vector3,
-}
-
-impl GunPhysics {
-    pub fn deflect(&mut self, velocity: Vector3, angular_velocity: Vector3) {
-        self.velocity = self.velocity + velocity;
-        self.angular_velocity = self.angular_velocity + angular_velocity;
-    }
-}
-
-pub type GunPhysicsManager = StructComponentManager<GunPhysics>;
-
-pub struct GunPhysicsSystem;
-
-impl System for GunPhysicsSystem {
-    fn update(&mut self, scene: &mut Scene, delta: f32) {
-        let test_physics = GunPhysics {
-            mass: 1.0,
-            rotational_inertia: 1.0,
-
-            spring_constant: 500.0,
-            angular_spring: 400.0,
-
-            damping: 20.0,
-            angular_damping: 20.0,
-
-            velocity: Vector3::zero(),
-            angular_velocity: Vector3::zero(),
-        };
-
-        let transform_manager = scene.get_manager::<TransformManager>();
-        let gun_animation_manager = scene.get_manager::<GunPhysicsManager>();
-
-        for (mut physics, entity) in gun_animation_manager.iter_mut() {
-            let mut transform = transform_manager.get_mut(entity);
-
-            // Calculate the force based on the offset from equilibrium (the origin).
-            let offset = transform.position().as_vector3();
-            let spring = -test_physics.spring_constant * offset;
-            let damping = -test_physics.damping * physics.velocity;
-            let force = spring + damping;
-
-            // Calculate the resulting acceleration using SCIENCE!
-            let acceleration = force / test_physics.mass;
-            physics.velocity = physics.velocity + acceleration * delta;
-
-            // Update the position.
-            transform.translate(physics.velocity * delta);
-
-            // Calculate torque.
-            let angular_offset = transform.rotation().as_eulers();
-            let spring_torque = -test_physics.angular_spring * angular_offset;
-            let damping_torque = -test_physics.angular_damping * physics.angular_velocity;
-            let torque = spring_torque + damping_torque;
-
-            let angular_acceleration = torque / test_physics.rotational_inertia;
-            physics.angular_velocity = physics.angular_velocity + angular_acceleration * delta;
-
-            let temp = physics.angular_velocity * delta;
-            transform.rotate(Quaternion::from_eulers(temp.x, temp.y, temp.z));
+            let mut rigidbody = rigidbody_manager.get_mut(self.gun_entity);
+            rigidbody.add_velocity(Vector3::new(0.0, 3.0, 10.0));
+            rigidbody.add_angular_velocity(Vector3::new(15.0 * PI, -8.0 * PI, 5.0 * PI));
         }
     }
 }

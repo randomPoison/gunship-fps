@@ -4,13 +4,22 @@ name = "fps"
 version = "0.0.0"
 authors = ["David LeGare <excaliburhissheath@gmail.com>"]
 
-# [[bin]]
-# name = "main"
+[[bin]]
+name = "main"
 
 [lib]
-name = "fps"
+name = "hotload"
 crate-type = ["dylib"]
 
 [dependencies.gunship]
 version = "*"
 path = "../gunship-rs"
+
+[profile.release]
+debug = true
+
+[profile.dev]
+opt-level = 3
+debug = true
+debug-assertions = true
+codegen-units = 1
