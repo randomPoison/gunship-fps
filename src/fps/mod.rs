@@ -25,16 +25,21 @@ pub fn game_init(engine: &mut Engine) {
     });
     engine.register_system(GunPhysicsSystem);
     engine.register_system(BulletSystem);
+
+    engine.register_system(RigidbodyUpdateSystem);
 }
 
 #[no_mangle]
 pub fn game_reload(old_engine: &Engine, engine: &mut Engine) {
     engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<BulletManager>().clone());
     engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<GunPhysicsManager>().clone());
+    engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<RigidbodyManager>().clone());
 
+    engine.register_system(old_engine.get_system_by_name::<PlayerMoveSystem>().clone());
     engine.register_system(BulletSystem);
     engine.register_system(GunPhysicsSystem);
-    engine.register_system(old_engine.get_system_by_name::<PlayerMoveSystem>().clone());
+
+    engine.register_system(RigidbodyUpdateSystem);
 }
 
 fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
