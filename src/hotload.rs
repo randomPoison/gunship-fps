@@ -1,5 +1,7 @@
+// #![cfg(feature="hotloading")]
+
 extern crate gunship;
 
-mod fps;
+pub mod fps;
 
-pub use fps::*;
+pub use fps::game_init;

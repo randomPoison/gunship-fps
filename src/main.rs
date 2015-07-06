@@ -1,6 +1,8 @@
+#![cfg(not(feature="hotloading"))]
+
 extern crate gunship;
 
-mod fps;
+pub mod fps;
 
 use gunship::Engine;
 

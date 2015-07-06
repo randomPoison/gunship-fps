@@ -4,12 +4,13 @@ name = "fps"
 version = "0.0.0"
 authors = ["David LeGare <excaliburhissheath@gmail.com>"]
 
-[[bin]]
-name = "main"
+# [lib]
+# name = "hotload"
+# crate-type = ["dylib"]
 
-[lib]
-name = "hotload"
-crate-type = ["dylib"]
+# [features]
+# default = ["hotloading"]
+# hotloading = []
 
 [dependencies.gunship]
 version = "*"
