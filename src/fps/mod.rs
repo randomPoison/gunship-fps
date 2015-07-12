@@ -1,6 +1,7 @@
 mod bullet;
 mod physics;
 mod player;
+mod gun;
 
 use std::f32::consts::PI;
 
@@ -9,26 +10,23 @@ use gunship::*;
 use self::bullet::*;
 use self::physics::*;
 use self::player::*;
+use self::gun::*;
 
 #[no_mangle]
 pub fn game_init(engine: &mut Engine) {
     engine.scene_mut().register_manager(BulletManager::new());
     engine.scene_mut().register_manager(GunPhysicsManager::new());
     engine.scene_mut().register_manager(RigidbodyManager::new());
+    engine.scene_mut().register_manager(GunManager::new());
+    engine.scene_mut().register_manager(PlayerManager::new());
 
-    let (root_entity, camera_entity, gun_entity) = scene_setup(engine.scene_mut());
-
-    engine.register_system(PlayerMoveSystem {
-        root: root_entity,
-        camera: camera_entity,
-        gun_entity: gun_entity,
-        bullet_offset: Vector3::new(0.0, 0.04, 0.2),
-        gun_alarm: None,
-    });
+    engine.register_system(PlayerMoveSystem);
     engine.register_system(GunPhysicsSystem);
     engine.register_system(BulletSystem);
 
     engine.register_system(RigidbodyUpdateSystem);
+
+    scene_setup(engine.scene_mut());
 }
 
 #[no_mangle]
@@ -36,6 +34,7 @@ pub fn game_reload(old_engine: &Engine, engine: &mut Engine) {
     engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<BulletManager>().clone());
     engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<GunPhysicsManager>().clone());
     engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<RigidbodyManager>().clone());
+    engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<GunManager>().clone());
 
     engine.register_system(old_engine.get_system_by_name::<PlayerMoveSystem>().clone());
     engine.register_system(BulletSystem);
@@ -44,7 +43,7 @@ pub fn game_reload(old_engine: &Engine, engine: &mut Engine) {
     engine.register_system(RigidbodyUpdateSystem);
 }
 
-fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
+fn scene_setup(scene: &mut Scene) {
     fn create_light(scene: &Scene, position: Point) -> Entity {
         let mut transform_manager = scene.get_manager_mut::<TransformManager>();
         let mut light_manager = scene.get_manager_mut::<LightManager>();
@@ -72,6 +71,8 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
     let mut audio_manager = scene.get_manager_mut::<AudioSourceManager>();
     let mut gun_animation_manager = scene.get_manager_mut::<GunPhysicsManager>();
     let mut rigidbody_manager = scene.get_manager_mut::<RigidbodyManager>();
+    let mut gun_manager = scene.get_manager_mut::<GunManager>();
+    let mut player_manager = scene.get_manager_mut::<PlayerManager>();
 
     let root_entity = {
         let entity = scene.create_entity();
@@ -85,7 +86,6 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
 
         entity
     };
-    println!("root entity: {:?}", root_entity);
 
     // Create camera.
     let camera_entity = {
@@ -122,13 +122,29 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
 
         mesh_manager.assign(gun_entity, "meshes/gun_small.dae");
         audio_manager.assign(gun_entity, "audio/Shotgun_Blast-Jim_Rogers-1914772763.wav");
+        gun_animation_manager.assign(gun_entity, GunPhysics {
+            spring_constant: 500.0,
+            angular_spring: 400.0,
+        });
+        rigidbody_manager.assign(gun_entity, Rigidbody::new());
+        let mut gun = gun_manager.assign(gun_entity, Gun::new());
+        gun.insert_magazine(Magazine {
+            capacity: 6,
+            rounds: 6,
+        });
 
         gun_entity
     };
-    println!("gun entity: {:?}", gun_entity);
 
     // Make gun a child of the camera.
     transform_manager.set_child(gun_root, gun_entity);
+
+    player_manager.assign(root_entity, Player {
+        camera: camera_entity,
+        gun_entity: gun_entity,
+        bullet_offset: Vector3::new(0.0, 0.04, 0.2),
+        gun_alarm: None,
+    });
 
     // Create static gun and bullet meshes.
     {
@@ -148,15 +164,4 @@ fn scene_setup(scene: &mut Scene) -> (Entity, Entity, Entity) {
         mesh_manager.assign(static_gun_entity, "meshes/gun_small.dae");
         mesh_manager.assign(static_bullet_entity, "meshes/cube.dae");
     }
-
-    // Add gun animation manager to player gun.
-    {
-        gun_animation_manager.assign(gun_entity, GunPhysics {
-            spring_constant: 500.0,
-            angular_spring: 400.0,
-        });
-        rigidbody_manager.assign(gun_entity, Rigidbody::new());
-    }
-
-    (root_entity, camera_entity, gun_entity)
 }
