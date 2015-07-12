@@ -23,6 +23,7 @@ pub fn game_init(engine: &mut Engine) {
         camera: camera_entity,
         gun_entity: gun_entity,
         bullet_offset: Vector3::new(0.0, 0.04, 0.2),
+        gun_alarm: None,
     });
     engine.register_system(GunPhysicsSystem);
     engine.register_system(BulletSystem);

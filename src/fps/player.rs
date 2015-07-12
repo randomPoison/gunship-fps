@@ -10,13 +10,37 @@ pub struct PlayerMoveSystem {
     pub camera: Entity,
     pub gun_entity: Entity,
     pub bullet_offset: Vector3,
+    pub gun_alarm: Option<AlarmID>,
 }
 
 const ACCELERATION: f32 = 50.0;
 const MAX_SPEED: f32 = 5.0;
 
 impl System for PlayerMoveSystem {
-    fn update(&mut self, scene: &mut Scene, delta: f32) {
+    fn update(&mut self, scene: &Scene, delta: f32) {
+        {
+            let mut alarm_manager = scene.get_manager_mut::<AlarmManager>();
+            if scene.input.key_down(ScanCode::W)
+            || scene.input.key_down(ScanCode::A)
+            || scene.input.key_down(ScanCode::S)
+            || scene.input.key_down(ScanCode::D) {
+                if self.gun_alarm.is_none() {
+                    let alarm_id = alarm_manager.assign_repeating(self.gun_entity, 0.5, |scene, entity| {
+                        let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
+
+                        let mut rigidbody = rigidbody_manager.get_mut(entity);
+                        rigidbody.add_velocity(Vector3::new(0.0, -0.25, 0.0));
+                        rigidbody.add_angular_velocity(Vector3::new(-0.5 * PI, 0.0, 0.0));
+                    });
+                    self.gun_alarm = Some(alarm_id);
+                }
+            } else if self.gun_alarm.is_some() {
+                let alarm_id = self.gun_alarm.unwrap();
+                alarm_manager.cancel(alarm_id);
+                self.gun_alarm = None;
+            }
+        }
+
         // Cache off the position and rotation and then drop the transform
         // so that we don't have multiple borrows of transform_manager.
         let (position, rotation) = {

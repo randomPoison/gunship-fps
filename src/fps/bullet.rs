@@ -12,6 +12,7 @@ impl Bullet {
         let mut transform_manager = scene.get_manager_mut::<TransformManager>();
         let mut mesh_manager = scene.get_manager_mut::<MeshManager>();
         let mut bullet_manager = scene.get_manager_mut::<BulletManager>();
+        let mut alarm_manager = scene.get_manager_mut::<AlarmManager>();
 
         let mut bullet_transform = transform_manager.assign(bullet_entity);
         bullet_transform.set_position(position);
@@ -20,6 +21,11 @@ impl Bullet {
         mesh_manager.assign(bullet_entity, "meshes/bullet_small.dae");
         bullet_manager.assign(bullet_entity, Bullet {
             speed: 5.0
+        });
+
+        alarm_manager.assign(bullet_entity, 1.0, |_scene, entity| {
+            // TODO: Destroy the bullet.
+            println!("Time to destroy bullet entity {:?}", entity);
         });
 
         bullet_entity
@@ -31,7 +37,7 @@ pub type BulletManager = StructComponentManager<Bullet>;
 pub struct BulletSystem;
 
 impl System for BulletSystem {
-    fn update(&mut self, scene: &mut Scene, delta: f32) {
+    fn update(&mut self, scene: &Scene, delta: f32) {
         let bullet_manager = scene.get_manager::<BulletManager>();
         let transform_manager = scene.get_manager::<TransformManager>();
 

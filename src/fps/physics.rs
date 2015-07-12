@@ -88,7 +88,7 @@ pub type RigidbodyManager = StructComponentManager<Rigidbody>;
 pub struct RigidbodyUpdateSystem;
 
 impl System for RigidbodyUpdateSystem {
-    fn update(&mut self, scene: &mut Scene, delta: f32) {
+    fn update(&mut self, scene: &Scene, delta: f32) {
         let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
         let transform_manager = scene.get_manager::<TransformManager>();
 
@@ -133,7 +133,7 @@ pub type GunPhysicsManager = StructComponentManager<GunPhysics>;
 pub struct GunPhysicsSystem;
 
 impl System for GunPhysicsSystem {
-    fn update(&mut self, scene: &mut Scene, _delta: f32) {
+    fn update(&mut self, scene: &Scene, _delta: f32) {
 
         let gun_animation_manager = scene.get_manager::<GunPhysicsManager>();
         let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
