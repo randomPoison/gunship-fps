@@ -18,9 +18,3 @@ path = "../gunship-rs"
 
 [profile.release]
 debug = true
-
-[profile.dev]
-opt-level = 3
-debug = true
-debug-assertions = true
-codegen-units = 1

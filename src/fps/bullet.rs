@@ -18,7 +18,7 @@ impl Bullet {
         bullet_transform.set_position(position);
         bullet_transform.set_rotation(rotation);
 
-        mesh_manager.assign(bullet_entity, "meshes/bullet_small.dae");
+        mesh_manager.assign(bullet_entity, "bullet_small.bullet_small_pCube1");
         bullet_manager.assign(bullet_entity, Bullet {
             speed: 5.0
         });

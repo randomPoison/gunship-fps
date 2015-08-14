@@ -44,6 +44,10 @@ pub fn game_reload(old_engine: &Engine, engine: &mut Engine) {
 }
 
 fn scene_setup(scene: &mut Scene) {
+    scene.resource_manager().load_model("meshes/cube.dae").unwrap();
+    scene.resource_manager().load_model("meshes/gun_small.dae").unwrap();
+    scene.resource_manager().load_model("meshes/bullet_small.dae").unwrap();
+
     fn create_light(scene: &Scene, position: Point) -> Entity {
         let mut transform_manager = scene.get_manager_mut::<TransformManager>();
         let mut light_manager = scene.get_manager_mut::<LightManager>();
@@ -58,21 +62,40 @@ fn scene_setup(scene: &mut Scene) {
             Light::Point(PointLight {
                 position: Point::origin()
             }));
-        mesh_manager.assign(light_entity, "meshes/cube.dae");
+        mesh_manager.assign(light_entity, "cube.pCube1");
 
         light_entity
     };
     create_light(scene, Point::new(-1.0, -1.5, 0.0));
     create_light(scene, Point::new(-1.0, 1.5, 0.0));
 
-    let mut transform_manager = scene.get_manager_mut::<TransformManager>();
-    let mut mesh_manager = scene.get_manager_mut::<MeshManager>();
     let mut camera_manager = scene.get_manager_mut::<CameraManager>();
     let mut audio_manager = scene.get_manager_mut::<AudioSourceManager>();
     let mut gun_animation_manager = scene.get_manager_mut::<GunPhysicsManager>();
     let mut rigidbody_manager = scene.get_manager_mut::<RigidbodyManager>();
     let mut gun_manager = scene.get_manager_mut::<GunManager>();
     let mut player_manager = scene.get_manager_mut::<PlayerManager>();
+
+    // Create gun mesh.
+    let gun_entity = {
+        let gun_entity = scene.instantiate_model("gun_small");
+        audio_manager.assign(gun_entity, "audio/Shotgun_Blast-Jim_Rogers-1914772763.wav");
+        gun_animation_manager.assign(gun_entity, GunPhysics {
+            spring_constant: 500.0,
+            angular_spring: 400.0,
+        });
+        rigidbody_manager.assign(gun_entity, Rigidbody::new());
+        let mut gun = gun_manager.assign(gun_entity, Gun::new());
+        gun.insert_magazine(Magazine {
+            capacity: 6,
+            rounds: 6,
+        });
+
+        gun_entity
+    };
+
+    let mut transform_manager = scene.get_manager_mut::<TransformManager>();
+    let mut mesh_manager = scene.get_manager_mut::<MeshManager>();
 
     let root_entity = {
         let entity = scene.create_entity();
@@ -115,27 +138,6 @@ fn scene_setup(scene: &mut Scene) {
     };
     transform_manager.set_child(camera_entity, gun_root);
 
-    // Create gun mesh.
-    let gun_entity = {
-        let gun_entity = scene.create_entity();
-        transform_manager.assign(gun_entity);
-
-        mesh_manager.assign(gun_entity, "meshes/gun_small.dae");
-        audio_manager.assign(gun_entity, "audio/Shotgun_Blast-Jim_Rogers-1914772763.wav");
-        gun_animation_manager.assign(gun_entity, GunPhysics {
-            spring_constant: 500.0,
-            angular_spring: 400.0,
-        });
-        rigidbody_manager.assign(gun_entity, Rigidbody::new());
-        let mut gun = gun_manager.assign(gun_entity, Gun::new());
-        gun.insert_magazine(Magazine {
-            capacity: 6,
-            rounds: 6,
-        });
-
-        gun_entity
-    };
-
     // Make gun a child of the camera.
     transform_manager.set_child(gun_root, gun_entity);
 
@@ -161,7 +163,7 @@ fn scene_setup(scene: &mut Scene) {
             bullet_transform.set_position(Point::new(-1.0, 0.0, 0.0));
         }
 
-        mesh_manager.assign(static_gun_entity, "meshes/gun_small.dae");
-        mesh_manager.assign(static_bullet_entity, "meshes/cube.dae");
+        mesh_manager.assign(static_gun_entity, "gun_small.pistol_body");
+        mesh_manager.assign(static_bullet_entity, "cube.pCube1");
     }
 }
