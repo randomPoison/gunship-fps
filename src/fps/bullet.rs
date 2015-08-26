@@ -23,9 +23,8 @@ impl Bullet {
             speed: 5.0
         });
 
-        alarm_manager.assign(bullet_entity, 1.0, |_scene, entity| {
-            // TODO: Destroy the bullet.
-            println!("Time to destroy bullet entity {:?}", entity);
+        alarm_manager.assign(bullet_entity, 1.0, |scene, entity| {
+            scene.destroy_entity(entity);
         });
 
         bullet_entity

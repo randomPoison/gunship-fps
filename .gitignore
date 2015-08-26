@@ -13,3 +13,4 @@ Cargo.lock
 builds/
 vtune/
 gunship-fps/
+stopwatch.csv
