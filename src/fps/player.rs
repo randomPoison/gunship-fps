@@ -35,7 +35,7 @@ impl System for PlayerMoveSystem {
                         let alarm_id = alarm_manager.assign_repeating(player.gun_entity, 0.5, |scene, entity| {
                             let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
 
-                            let mut rigidbody = rigidbody_manager.get_mut(entity);
+                            let mut rigidbody = rigidbody_manager.get_mut(entity).unwrap();
                             rigidbody.add_velocity(Vector3::new(0.0, -0.25, 0.0));
                             rigidbody.add_angular_velocity(Vector3::new(-0.5 * PI, 0.0, 0.0));
                         });
@@ -60,7 +60,7 @@ impl System for PlayerMoveSystem {
                 // The root entity handles all translation as well as rotation around the Y axis.
                 {
                     let mut transform = transform_manager.get_mut(root_entity);
-                    let mut rigidbody = rigidbody_manager.get_mut(root_entity);
+                    let mut rigidbody = rigidbody_manager.get_mut(root_entity).unwrap();
 
                     let rotation = transform.rotation();
                     let mut velocity = rigidbody.velocity();
@@ -128,7 +128,7 @@ impl System for PlayerMoveSystem {
             if scene.input.mouse_button_pressed(1) {
                 let gun_manager = scene.get_manager::<GunManager>();
 
-                let mut gun = gun_manager.get_mut(player.gun_entity);
+                let mut gun = gun_manager.get_mut(player.gun_entity).unwrap();
                 gun.pull_hammer();
             }
 
@@ -137,7 +137,7 @@ impl System for PlayerMoveSystem {
                 let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
                 let gun_manager = scene.get_manager::<GunManager>();
 
-                let mut gun = gun_manager.get_mut(player.gun_entity);
+                let mut gun = gun_manager.get_mut(player.gun_entity).unwrap();
                 if gun.can_fire() {
                     gun.fire();
 
@@ -151,7 +151,7 @@ impl System for PlayerMoveSystem {
                                    + (player.bullet_offset.z * forward_dir);
                     Bullet::new(scene, bullet_pos, rotation);
 
-                    let mut rigidbody = rigidbody_manager.get_mut(player.gun_entity);
+                    let mut rigidbody = rigidbody_manager.get_mut(player.gun_entity).unwrap();
                     rigidbody.add_velocity(Vector3::new(0.0, 3.0, 10.0));
                     rigidbody.add_angular_velocity(Vector3::new(15.0 * PI, -8.0 * PI, 5.0 * PI));
                 }

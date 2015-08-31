@@ -2,36 +2,36 @@ use gunship::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Rigidbody {
-        /// Mass (in kilograms) of the rigidbody.
-        pub mass: f32,
+    /// Mass (in kilograms) of the rigidbody.
+    pub mass: f32,
 
-        /// Rotoational inertia (or moment of inertia) of the rigid body in whatever units are normally used ?_?
-        pub rotational_inertia: f32,
+    /// Rotoational inertia (or moment of inertia) of the rigid body in whatever units are normally used ?_?
+    pub rotational_inertia: f32,
 
-        pub linear_drag: f32,
-        pub angular_drag: f32,
+    pub linear_drag: f32,
+    pub angular_drag: f32,
 
-        /// The current velocity of the simulation in meters per second.
-        velocity: Vector3,
+    /// The current velocity of the simulation in meters per second.
+    velocity: Vector3,
 
-        /// The current angular velocity represented as euler angles.
-        ///
-        /// The angular velocity is represented using euler angles because quaternions can't
-        /// represent rotations greater than 180 degrees. Euler angles allow for high rotation
-        /// speeds to be represented in a
-        angular_velocity: Vector3,
+    /// The current angular velocity represented as euler angles.
+    ///
+    /// The angular velocity is represented using euler angles because quaternions can't
+    /// represent rotations greater than 180 degrees. Euler angles allow for high rotation
+    /// speeds to be represented in a
+    angular_velocity: Vector3,
 
-        /// The total force applied to the rigidbody for the frame.
-        ///
-        /// Every frame all forces applied to the rigidbody are summed and used to calculate
-        /// the rigidbody's acceleration for the frame.
-        force: Vector3,
+    /// The total force applied to the rigidbody for the frame.
+    ///
+    /// Every frame all forces applied to the rigidbody are summed and used to calculate
+    /// the rigidbody's acceleration for the frame.
+    force: Vector3,
 
-        /// The total torque applied to the rigidbody for the frame.
-        ///
-        /// Every frame all torques applied to the rigidbody are summed and used to calculate
-        /// the rigidbody's angular acceleration for the frame.
-        torque: Vector3,
+    /// The total torque applied to the rigidbody for the frame.
+    ///
+    /// Every frame all torques applied to the rigidbody are summed and used to calculate
+    /// the rigidbody's angular acceleration for the frame.
+    torque: Vector3,
 }
 
 impl Rigidbody {
@@ -134,13 +134,12 @@ pub struct GunPhysicsSystem;
 
 impl System for GunPhysicsSystem {
     fn update(&mut self, scene: &Scene, _delta: f32) {
-
         let gun_animation_manager = scene.get_manager::<GunPhysicsManager>();
         let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
         let transform_manager = scene.get_manager::<TransformManager>();
 
         for (mut gun_physics, entity) in gun_animation_manager.iter_mut() {
-            let mut rigidbody = rigidbody_manager.get_mut(entity);
+            let mut rigidbody = rigidbody_manager.get_mut(entity).unwrap();
             let transform = transform_manager.get(entity);
 
             // Override values for debug purposes.
