@@ -1,3 +1,5 @@
+extern crate gunship;
+
 mod bullet;
 mod physics;
 mod player;
@@ -5,12 +7,18 @@ mod gun;
 
 use std::f32::consts::PI;
 
-use gunship::*;
+pub use gunship::*;
 
 use self::bullet::*;
 use self::physics::*;
 use self::player::*;
 use self::gun::*;
+
+pub fn do_main() {
+    let mut engine = Engine::new();
+    game_init(&mut engine);
+    engine.main_loop();
+}
 
 #[no_mangle]
 pub fn game_init(engine: &mut Engine) {
@@ -31,10 +39,12 @@ pub fn game_init(engine: &mut Engine) {
 
 #[no_mangle]
 pub fn game_reload(old_engine: &Engine, engine: &mut Engine) {
-    engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<BulletManager>().clone());
-    engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<GunPhysicsManager>().clone());
-    engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<RigidbodyManager>().clone());
-    engine.scene_mut().register_manager(old_engine.scene().get_manager_by_name::<GunManager>().clone());
+    engine.scene_mut().reload_manager::<BulletManager>(old_engine.scene());
+    engine.scene_mut().reload_manager::<GunPhysicsManager>(old_engine.scene());
+    engine.scene_mut().reload_manager::<RigidbodyManager>(old_engine.scene());
+    engine.scene_mut().reload_manager::<GunManager>(old_engine.scene());
+    engine.scene_mut().reload_manager::<PlayerManager>(old_engine.scene());
+
 
     engine.register_system(old_engine.get_system_by_name::<PlayerMoveSystem>().clone());
     engine.register_system(BulletSystem);

@@ -1,9 +1,9 @@
 use std::f32::consts::PI;
 
 use gunship::*;
-use fps::physics::*;
-use fps::bullet::*;
-use fps::gun::*;
+use physics::*;
+use bullet::*;
+use gun::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Player {

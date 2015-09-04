@@ -4,17 +4,18 @@ name = "fps"
 version = "0.0.0"
 authors = ["David LeGare <excaliburhissheath@gmail.com>"]
 
-# [lib]
-# name = "hotload"
-# crate-type = ["dylib"]
-
-# [features]
-# default = ["hotloading"]
-# hotloading = []
+[lib]
+name = "fps"
+crate-type = ["dylib", "rlib"]
 
 [dependencies.gunship]
 version = "*"
 path = "../gunship-rs"
+features = ["hotloading"]
+
+[dependencies.loader]
+version = "*"
+path = "../gunship-rs/lib/loader"
 
 [profile.release]
 debug = true

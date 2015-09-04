@@ -21,9 +21,9 @@ impl Gun {
     }
 
     pub fn insert_magazine(&mut self, magazine: Magazine) {
-        assert!(self.magazine.is_none());
-        assert!(magazine.capacity > 0);
-        assert!(magazine.rounds <= magazine.capacity);
+        debug_assert!(self.magazine.is_none());
+        debug_assert!(magazine.capacity > 0);
+        debug_assert!(magazine.rounds <= magazine.capacity);
 
         self.magazine = Some(magazine);
     }
@@ -37,10 +37,6 @@ impl Gun {
     }
 
     pub fn fire(&mut self) {
-        assert!(self.magazine.is_some());
-        assert!(self.magazine.as_ref().unwrap().rounds > 0);
-        assert!(self.is_cocked);
-
         self.magazine.as_mut().unwrap().rounds -= 1;
         self.is_cocked = false;
     }
