@@ -33,6 +33,7 @@ impl Bullet {
 
 pub type BulletManager = StructComponentManager<Bullet>;
 
+#[derive(Debug, Clone)]
 pub struct BulletSystem;
 
 impl System for BulletSystem {
@@ -42,9 +43,9 @@ impl System for BulletSystem {
 
         for (bullet, entity) in bullet_manager.iter() {
             let mut transform = transform_manager.get_mut(entity);
-            let position = transform.position();
-            let forward = -transform.rotation().as_matrix().z_part();
-            transform.set_position(position + forward * bullet.speed * delta);
+
+            let forward  = transform.forward();
+            transform.translate(forward * bullet.speed * delta);
         }
     }
 }

@@ -130,6 +130,7 @@ pub struct GunPhysics {
 
 pub type GunPhysicsManager = StructComponentManager<GunPhysics>;
 
+#[derive(Debug, Clone)]
 pub struct GunPhysicsSystem;
 
 impl System for GunPhysicsSystem {

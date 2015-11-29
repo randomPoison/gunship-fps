@@ -20,44 +20,65 @@ pub fn do_main() {
     engine.main_loop();
 }
 
-#[no_mangle]
-pub fn game_init(engine: &mut Engine) {
-    engine.scene_mut().register_manager(BulletManager::new());
-    engine.scene_mut().register_manager(GunPhysicsManager::new());
-    engine.scene_mut().register_manager(RigidbodyManager::new());
-    engine.scene_mut().register_manager(GunManager::new());
-    engine.scene_mut().register_manager(PlayerManager::new());
+/// Super cool temporary macro to paper over the fact that Gunship's hotloading support is
+/// basically one big hack.
+///
+/// This allows me to just list off the managers, systems, and models that are used in the game and
+/// automatically handle registering at startup and reloading for hotloading support. Eventually
+/// I'd like the engine to more gracefully handle this automatically (through compile time code
+/// generation most likely), but for now I'm leaving this at the game layer so that it at least
+/// doesn't infect the engine proper.
+macro_rules! game_setup {
+    (
+        setup    $setup:ident,
+        managers
+        $(m  $manager:ty => $manager_instance:expr,)*
+        systems
+        $(s  $system:ty => $system_instance:expr,)*
+        models
+        $(md $model:expr,)*
+    ) => {
+        #[no_mangle]
+        pub fn game_init(engine: &mut Engine) {
+            $(engine.scene_mut().register_manager($manager_instance);)*
+            $(engine.register_system($system_instance);)*
 
-    engine.register_system(PlayerMoveSystem);
-    engine.register_system(GunPhysicsSystem);
-    engine.register_system(BulletSystem);
+            $(engine.scene().resource_manager().load_model($model).unwrap();)*
 
-    engine.register_system(RigidbodyUpdateSystem);
+            $setup(engine.scene_mut());
+        }
 
-    scene_setup(engine.scene_mut());
+        #[no_mangle]
+        pub fn game_reload(old_engine: &Engine, engine: &mut Engine) {
+            $(engine.scene_mut().reload_manager::<$manager>(old_engine.scene());)*
+            $(engine.register_system(old_engine.get_system_by_name::<$system>().clone());)*
+        }
+    }
 }
 
-#[no_mangle]
-pub fn game_reload(old_engine: &Engine, engine: &mut Engine) {
-    engine.scene_mut().reload_manager::<BulletManager>(old_engine.scene());
-    engine.scene_mut().reload_manager::<GunPhysicsManager>(old_engine.scene());
-    engine.scene_mut().reload_manager::<RigidbodyManager>(old_engine.scene());
-    engine.scene_mut().reload_manager::<GunManager>(old_engine.scene());
-    engine.scene_mut().reload_manager::<PlayerManager>(old_engine.scene());
+game_setup! {
+    setup scene_setup,
 
+    managers
+    m  BulletManager => BulletManager::new(),
+    m  GunPhysicsManager => GunPhysicsManager::new(),
+    m  RigidbodyManager => RigidbodyManager::new(),
+    m  GunManager => GunManager::new(),
+    m  PlayerManager => PlayerManager::new(),
 
-    engine.register_system(old_engine.get_system_by_name::<PlayerMoveSystem>().clone());
-    engine.register_system(BulletSystem);
-    engine.register_system(GunPhysicsSystem);
+    systems
+    s  PlayerMoveSystem => PlayerMoveSystem,
+    s  GunPhysicsSystem => GunPhysicsSystem,
+    s  BulletSystem => BulletSystem,
+    s  RigidbodyUpdateSystem => RigidbodyUpdateSystem,
 
-    engine.register_system(RigidbodyUpdateSystem);
+    models
+    md "meshes/cube.dae",
+    md "meshes/gun_small.dae",
+    md "meshes/bullet_small.dae",
 }
 
 fn scene_setup(scene: &mut Scene) {
-    scene.resource_manager().load_model("meshes/cube.dae").unwrap();
-    scene.resource_manager().load_model("meshes/gun_small.dae").unwrap();
-    scene.resource_manager().load_model("meshes/bullet_small.dae").unwrap();
-
     fn create_light(scene: &Scene, position: Point) -> Entity {
         let mut transform_manager = scene.get_manager_mut::<TransformManager>();
         let mut light_manager = scene.get_manager_mut::<LightManager>();

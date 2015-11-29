@@ -10,7 +10,7 @@ crate-type = ["dylib", "rlib"]
 
 [dependencies.gunship]
 version = "*"
-path = "../gunship-rs"
+path = "gunship-rs"
 features = ["hotloading"]
 
 [dependencies.loader]

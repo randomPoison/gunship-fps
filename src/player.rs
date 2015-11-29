@@ -68,9 +68,8 @@ impl System for PlayerMoveSystem {
                     transform.set_rotation(Quaternion::from_eulers(0.0, (-movement_x as f32) * PI * 0.001, 0.0) * rotation);
 
                     // Calculate the forward and right vectors.
-                    // TODO: Directly retrieve local axis from transform without going through rotation matrix.
-                    let forward_dir = -transform.rotation().as_matrix().z_part();
-                    let right_dir = transform.rotation().as_matrix().x_part();
+                    let forward_dir = transform.forward();
+                    let right_dir   = transform.right();
 
                     // Move camera based on input.
                     if scene.input.key_down(ScanCode::W) {
@@ -121,9 +120,10 @@ impl System for PlayerMoveSystem {
                 (gun_transform.position_derived(), gun_transform.rotation_derived())
             };
 
-            let up_dir = rotation.as_matrix().y_part();
-            let right_dir = rotation.as_matrix().y_part();
-            let forward_dir = -rotation.as_matrix().z_part();
+            let rotation_matrix = Matrix3::from_quaternion(rotation);
+            let up_dir = rotation_matrix.y_part();
+            let right_dir = rotation_matrix.y_part();
+            let forward_dir = -rotation_matrix.z_part();
 
             if scene.input.mouse_button_pressed(1) {
                 let gun_manager = scene.get_manager::<GunManager>();
@@ -141,7 +141,7 @@ impl System for PlayerMoveSystem {
                 if gun.can_fire() {
                     gun.fire();
 
-                    let mut audio_source = audio_manager.get_mut(player.gun_entity);
+                    let mut audio_source = audio_manager.get_mut(player.gun_entity).unwrap();
                     audio_source.reset();
                     audio_source.play();
 

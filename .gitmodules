@@ -1,0 +1,3 @@
+[submodule "gunship-rs"]
+	path = gunship-rs
+	url = ./gunship-rs
