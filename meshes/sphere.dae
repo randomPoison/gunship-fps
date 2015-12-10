@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
-  <asset><contributor><author></author><authoring_tool>FBX COLLADA exporter</authoring_tool><comments></comments></contributor><created>2015-03-22T14:32:41Z</created><keywords></keywords><modified>2015-03-22T14:32:41Z</modified><revision></revision><subject></subject><title></title><unit meter="0.010000" name="centimeter"></unit><up_axis>Y_UP</up_axis></asset>
+  <asset>
+      <contributor>
+          <author></author>
+          <authoring_tool>FBX COLLADA exporter</authoring_tool>
+          <comments></comments>
+      </contributor>
+      <created>2015-03-22T14:32:41Z</created>
+      <keywords></keywords>
+      <modified>2015-03-22T14:32:41Z</modified>
+      <revision></revision>
+      <subject></subject>
+      <title></title>
+      <unit meter="0.010000" name="centimeter"></unit>
+      <up_axis>Y_UP</up_axis>
+  </asset>
   <library_materials>
     <material id="lambert1" name="lambert1">
       <instance_effect url="#lambert1-fx"/>
@@ -1283,8 +1297,35 @@
   </library_geometries>
   <library_visual_scenes>
     <visual_scene id="sphere" name="sphere">
-      <node name="pSphere1" id="pSphere1" sid="pSphere1"><matrix sid="matrix">1.000000 0.000000 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000 0.000000 0.000000 1.000000</matrix><instance_geometry url="#pSphere1-lib"><bind_material><technique_common><instance_material symbol="lambert1" target="#lambert1"/></technique_common></bind_material></instance_geometry><extra><technique profile="FCOLLADA"><visibility>1.000000</visibility></technique></extra></node>
-      <extra><technique profile="MAX3D"><frame_rate>24.000000</frame_rate></technique><technique profile="FCOLLADA"><start_time>0.041667</start_time><end_time>8.333333</end_time></technique></extra>
+      <node name="pSphere1" id="pSphere1" sid="pSphere1">
+          <matrix sid="matrix">
+              1.000000 0.000000 0.000000 0.000000
+              0.000000 1.000000 0.000000 0.000000
+              0.000000 0.000000 1.000000 0.000000
+              0.000000 0.000000 0.000000 1.000000
+          </matrix>
+          <instance_geometry url="#pSphere1-lib">
+              <bind_material>
+                  <technique_common>
+                      <instance_material symbol="lambert1" target="#lambert1"/>
+                  </technique_common>
+              </bind_material>
+          </instance_geometry>
+          <extra>
+              <technique profile="FCOLLADA">
+                  <visibility>1.000000</visibility>
+              </technique>
+          </extra>
+      </node>
+      <extra>
+          <technique profile="MAX3D">
+              <frame_rate>24.000000</frame_rate>
+          </technique>
+          <technique profile="FCOLLADA">
+              <start_time>0.041667</start_time>
+              <end_time>8.333333</end_time>
+          </technique>
+      </extra>
     </visual_scene>
   </library_visual_scenes>
   <scene>

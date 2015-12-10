@@ -8,14 +8,12 @@ authors = ["David LeGare <excaliburhissheath@gmail.com>"]
 name = "fps"
 crate-type = ["dylib", "rlib"]
 
-[dependencies.gunship]
-version = "*"
-path = "gunship-rs"
-features = ["hotloading"]
+[dependencies]
+gunship = { version = "*", path = "gunship-rs", features = ["hotloading"] }
+# loader  = { version = "*", path = "../gunship-rs/lib/loader" }
 
-[dependencies.loader]
-version = "*"
-path = "../gunship-rs/lib/loader"
+[profile.dev]
+opt-level = 0
 
 [profile.release]
 debug = true

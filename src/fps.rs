@@ -30,20 +30,23 @@ pub fn do_main() {
 /// doesn't infect the engine proper.
 macro_rules! game_setup {
     (
-        setup    $setup:ident,
-        managers
-        $(m  $manager:ty => $manager_instance:expr,)*
-        systems
-        $(s  $system:ty => $system_instance:expr,)*
-        models
-        $(md $model:expr,)*
+        setup: $setup:ident,
+
+        managers:
+        $($manager:ty => $manager_instance:expr),*
+
+        systems:
+        $($system:ty => $system_instance:expr),*
+
+        models:
+        $($model:expr),*
     ) => {
         #[no_mangle]
         pub fn game_init(engine: &mut Engine) {
             $(engine.scene_mut().register_manager($manager_instance);)*
             $(engine.register_system($system_instance);)*
 
-            $(engine.scene().resource_manager().load_model($model).unwrap();)*
+            $(engine.scene().resource_manager().load_resource_file($model).unwrap();)*
 
             $setup(engine.scene_mut());
         }
@@ -57,35 +60,44 @@ macro_rules! game_setup {
 }
 
 game_setup! {
-    setup scene_setup,
+    setup: scene_setup,
 
-    managers
-    m  BulletManager => BulletManager::new(),
-    m  GunPhysicsManager => GunPhysicsManager::new(),
-    m  RigidbodyManager => RigidbodyManager::new(),
-    m  GunManager => GunManager::new(),
-    m  PlayerManager => PlayerManager::new(),
+    managers:
+        BulletManager     => BulletManager::new(),
+        GunPhysicsManager => GunPhysicsManager::new(),
+        RigidbodyManager  => RigidbodyManager::new(),
+        GunManager        => GunManager::new(),
+        PlayerManager     => PlayerManager::new()
 
-    systems
-    s  PlayerMoveSystem => PlayerMoveSystem,
-    s  GunPhysicsSystem => GunPhysicsSystem,
-    s  BulletSystem => BulletSystem,
-    s  RigidbodyUpdateSystem => RigidbodyUpdateSystem,
+    systems:
+        PlayerMoveSystem      => PlayerMoveSystem,
+        GunPhysicsSystem      => GunPhysicsSystem,
+        BulletSystem          => BulletSystem,
+        RigidbodyUpdateSystem => RigidbodyUpdateSystem
 
-    models
-    md "meshes/cube.dae",
-    md "meshes/gun_small.dae",
-    md "meshes/bullet_small.dae",
+    models:
+        "meshes/cube.dae",
+        "meshes/gun_small.dae",
+        "meshes/bullet_small.dae",
+        "meshes/sphere.dae"
 }
 
 fn scene_setup(scene: &mut Scene) {
-    fn create_light(scene: &Scene, position: Point) -> Entity {
-        let mut transform_manager = scene.get_manager_mut::<TransformManager>();
-        let mut light_manager = scene.get_manager_mut::<LightManager>();
-        let mut mesh_manager = scene.get_manager_mut::<MeshManager>();
+    // Instantiate some entities from "prefabs", e.g. create their full mesh hierarchy. No way to
+    // specify more prefab data than that at this point. Also we can't have the transform manager
+    // or the mesh manager borrowed when we call `instantiate_model()` or we panic.
+    let static_gun_entity = scene.instantiate_model("gun_small");
+    let static_cube_entity = scene.instantiate_model("cube");
+    let gun_entity = scene.instantiate_model("gun_small");
 
-        let light_entity = scene.create_entity();
-        let mut transform = transform_manager.assign(light_entity);
+    // Create lights with a helper function.
+    fn create_light(scene: &Scene, position: Point) -> Entity {
+        let light_entity = scene.instantiate_model("sphere");
+
+        let transform_manager = scene.get_manager::<TransformManager>();
+        let mut light_manager = scene.get_manager_mut::<LightManager>();
+
+        let mut transform = transform_manager.get_mut(light_entity);
         transform.set_position(position);
         transform.set_scale(Vector3::new(0.1, 0.1, 0.1));
         light_manager.assign(
@@ -93,23 +105,22 @@ fn scene_setup(scene: &mut Scene) {
             Light::Point(PointLight {
                 position: Point::origin()
             }));
-        mesh_manager.assign(light_entity, "cube.pCube1");
 
         light_entity
     };
     create_light(scene, Point::new(-1.0, -1.5, 0.0));
     create_light(scene, Point::new(-1.0, 1.5, 0.0));
 
-    let mut camera_manager = scene.get_manager_mut::<CameraManager>();
-    let mut audio_manager = scene.get_manager_mut::<AudioSourceManager>();
+    let mut audio_manager         = scene.get_manager_mut::<AudioSourceManager>();
+    let mut camera_manager        = scene.get_manager_mut::<CameraManager>();
     let mut gun_animation_manager = scene.get_manager_mut::<GunPhysicsManager>();
-    let mut rigidbody_manager = scene.get_manager_mut::<RigidbodyManager>();
-    let mut gun_manager = scene.get_manager_mut::<GunManager>();
-    let mut player_manager = scene.get_manager_mut::<PlayerManager>();
+    let mut gun_manager           = scene.get_manager_mut::<GunManager>();
+    let mut player_manager        = scene.get_manager_mut::<PlayerManager>();
+    let mut rigidbody_manager     = scene.get_manager_mut::<RigidbodyManager>();
+    let mut transform_manager     = scene.get_manager_mut::<TransformManager>();
 
-    // Create gun mesh.
-    let gun_entity = {
-        let gun_entity = scene.instantiate_model("gun_small");
+    // Fully create gun entity.
+    {
         audio_manager.assign(gun_entity, "audio/Shotgun_Blast-Jim_Rogers-1914772763.wav");
         gun_animation_manager.assign(gun_entity, GunPhysics {
             spring_constant: 500.0,
@@ -124,9 +135,6 @@ fn scene_setup(scene: &mut Scene) {
 
         gun_entity
     };
-
-    let mut transform_manager = scene.get_manager_mut::<TransformManager>();
-    let mut mesh_manager = scene.get_manager_mut::<MeshManager>();
 
     let root_entity = {
         let entity = scene.create_entity();
@@ -155,7 +163,6 @@ fn scene_setup(scene: &mut Scene) {
 
         camera_entity
     };
-    println!("camera entity: {:?}", camera_entity);
 
     transform_manager.set_child(root_entity, camera_entity);
 
@@ -181,20 +188,12 @@ fn scene_setup(scene: &mut Scene) {
 
     // Create static gun and bullet meshes.
     {
-        let static_gun_entity = scene.create_entity();
-        let static_bullet_entity = scene.create_entity();
+        let mut gun_transform = transform_manager.get_mut(static_gun_entity);
+        gun_transform.set_position(Point::new(0.0, 0.0, -1.0));
+    }
 
-        {
-            let mut gun_transform = transform_manager.assign(static_gun_entity);
-            gun_transform.set_position(Point::new(0.0, 0.0, -1.0));
-        }
-
-        {
-            let mut bullet_transform = transform_manager.assign(static_bullet_entity);
-            bullet_transform.set_position(Point::new(-1.0, 0.0, 0.0));
-        }
-
-        mesh_manager.assign(static_gun_entity, "gun_small.pistol_body");
-        mesh_manager.assign(static_bullet_entity, "cube.pCube1");
+    {
+        let mut bullet_transform = transform_manager.get_mut(static_cube_entity);
+        bullet_transform.set_position(Point::new(-1.0, 0.0, 0.0));
     }
 }

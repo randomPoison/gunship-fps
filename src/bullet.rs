@@ -7,18 +7,16 @@ pub struct Bullet {
 
 impl Bullet {
     pub fn new(scene: &Scene, position: Point, rotation: Quaternion) -> Entity {
-        let bullet_entity = scene.create_entity();
+        let bullet_entity = scene.instantiate_model("bullet_small");
 
-        let mut transform_manager = scene.get_manager_mut::<TransformManager>();
-        let mut mesh_manager = scene.get_manager_mut::<MeshManager>();
+        let transform_manager = scene.get_manager::<TransformManager>();
         let mut bullet_manager = scene.get_manager_mut::<BulletManager>();
         let mut alarm_manager = scene.get_manager_mut::<AlarmManager>();
 
-        let mut bullet_transform = transform_manager.assign(bullet_entity);
+        let mut bullet_transform = transform_manager.get_mut(bullet_entity);
         bullet_transform.set_position(position);
         bullet_transform.set_rotation(rotation);
 
-        mesh_manager.assign(bullet_entity, "bullet_small.bullet_small_pCube1");
         bullet_manager.assign(bullet_entity, Bullet {
             speed: 5.0
         });
