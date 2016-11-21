@@ -1,49 +1,36 @@
 use gunship::*;
+use gunship::math::*;
+use gunship::mesh_renderer::MeshRenderer;
+use gunship::resource::Mesh;
+use gunship::transform::Transform;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct Bullet {
+    transform: Transform,
+    mesh_renderer: MeshRenderer,
     pub speed: f32,
 }
 
 impl Bullet {
-    pub fn new(scene: &Scene, position: Point, rotation: Quaternion) -> Entity {
-        let bullet_entity = scene.instantiate_model("bullet_small");
+    pub fn new(mesh: &Mesh, position: Point, orientation: Orientation) -> Bullet {
+        let mut transform = Transform::new();
+        transform.set_position(position);
+        transform.set_orientation(orientation);
 
-        let transform_manager = scene.get_manager::<TransformManager>();
-        let mut bullet_manager = scene.get_manager_mut::<BulletManager>();
-        let mut alarm_manager = scene.get_manager_mut::<AlarmManager>();
+        // TODO: Remove this once we have a proper bullet mesh.
+        transform.set_scale(Vector3::new(0.1, 0.1, 1.0));
 
-        let mut bullet_transform = transform_manager.get_mut(bullet_entity);
-        bullet_transform.set_position(position);
-        bullet_transform.set_rotation(rotation);
+        let mesh_renderer = MeshRenderer::new(mesh, &transform);
 
-        bullet_manager.assign(bullet_entity, Bullet {
-            speed: 5.0
-        });
-
-        alarm_manager.assign(bullet_entity, 1.0, |scene, entity| {
-            scene.destroy_entity(entity);
-        });
-
-        bullet_entity
-    }
-}
-
-pub type BulletManager = StructComponentManager<Bullet>;
-
-#[derive(Debug, Clone)]
-pub struct BulletSystem;
-
-impl System for BulletSystem {
-    fn update(&mut self, scene: &Scene, delta: f32) {
-        let bullet_manager = scene.get_manager::<BulletManager>();
-        let transform_manager = scene.get_manager::<TransformManager>();
-
-        for (bullet, entity) in bullet_manager.iter() {
-            let mut transform = transform_manager.get_mut(entity);
-
-            let forward  = transform.forward();
-            transform.translate(forward * bullet.speed * delta);
+        Bullet {
+            transform: transform,
+            mesh_renderer: mesh_renderer,
+            speed: 10.0
         }
+    }
+
+    pub fn update(&mut self) {
+        let forward = self.transform.forward();
+        self.transform.translate(forward * self.speed * time::delta_f32());
     }
 }

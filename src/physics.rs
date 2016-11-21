@@ -1,6 +1,8 @@
 use gunship::*;
+use gunship::math::*;
+use gunship::transform::Transform;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct Rigidbody {
     /// Mass (in kilograms) of the rigidbody.
     pub mass: f32,
@@ -78,87 +80,72 @@ impl Rigidbody {
 
     /// Applies the specified torque to the rigidbody.
     pub fn apply_torque(&mut self, torque: Vector3) {
-        self.torque = self.torque + torque;
+        self.torque += torque;
+    }
+
+    pub fn update(&mut self, transform: &mut Transform) {
+        // Calculate the acceleration from the forces, then use the acceleration to
+        // update the velocity.
+        let damping = -self.linear_drag * self.velocity;
+        let force = self.force + damping;
+
+        let acceleration = force / self.mass;
+        self.velocity = self.velocity + acceleration * time::delta_f32();
+
+        transform.translate(self.velocity * time::delta_f32());
+
+        // Calculate angular acceleration from the torques, then use angular acceleration
+        // to update the angular velocity.
+        let damping_torque = -self.angular_drag * self.angular_velocity;
+        let torque = self.torque + damping_torque;
+
+        let angular_acceleration = torque / self.rotational_inertia;
+        self.angular_velocity = self.angular_velocity + angular_acceleration * time::delta_f32();
+
+        let Vector3 { x, y, z } = self.angular_velocity * time::delta_f32();
+        transform.rotate(Orientation::from_eulers(x, y, z));
+
+        // Force and torque are both instantaneous. They're accumlated by all forces acting on the
+        // rigidbody during the frame, applied all at once, and then the total is reset for the
+        // next frame.
+        self.force = Vector3::zero();
+        self.torque = Vector3::zero();
     }
 }
 
-pub type RigidbodyManager = StructComponentManager<Rigidbody>;
-
-#[derive(Debug, Clone, Copy)]
-pub struct RigidbodyUpdateSystem;
-
-impl System for RigidbodyUpdateSystem {
-    fn update(&mut self, scene: &Scene, delta: f32) {
-        let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
-        let transform_manager = scene.get_manager::<TransformManager>();
-
-        for (mut rigidbody, entity) in rigidbody_manager.iter_mut() {
-            let mut transform = transform_manager.get_mut(entity);
-
-            // Calculate the acceleration from the forces, then use the acceleration to
-            // update the velocity.
-            let damping = -rigidbody.linear_drag * rigidbody.velocity;
-            let force = rigidbody.force + damping;
-
-            let acceleration = force / rigidbody.mass;
-            rigidbody.velocity = rigidbody.velocity + acceleration * delta;
-
-            transform.translate(rigidbody.velocity * delta);
-
-            // Calculate angular acceleration from the torques, then use angular acceleration
-            // to update the angular velocity.
-            let damping_torque = -rigidbody.angular_drag * rigidbody.angular_velocity;
-            let torque = rigidbody.torque + damping_torque;
-
-            let angular_acceleration = torque / rigidbody.rotational_inertia;
-            rigidbody.angular_velocity = rigidbody.angular_velocity + angular_acceleration * delta;
-
-            let delta_angular = rigidbody.angular_velocity * delta;
-            transform.rotate(Quaternion::from_eulers(delta_angular.x, delta_angular.y, delta_angular.z)); // TODO: Add Transform::rotate_eulers() for convenience.
-
-            rigidbody.force = Vector3::zero();
-            rigidbody.torque = Vector3::zero();
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct GunPhysics {
-    pub spring_constant: f32,
+    pub linear_spring: f32,
     pub angular_spring: f32,
+
+    pub position_offset: Vector3,
+
+    pub target_position: Point,
+    pub target_orientation: Orientation,
 }
 
-pub type GunPhysicsManager = StructComponentManager<GunPhysics>;
+impl GunPhysics {
+    pub fn update_target(&mut self, target_transform: &Transform) {
+        self.target_position = target_transform.position() + target_transform.orientation() * self.position_offset;
+        self.target_orientation = target_transform.orientation();
+    }
 
-#[derive(Debug, Clone)]
-pub struct GunPhysicsSystem;
+    pub fn update(&mut self, rigidbody: &mut Rigidbody, transform: &Transform) {
+        // Override values for debug purposes.
+        self.linear_spring = 500.0;
+        self.angular_spring = 400.0;
 
-impl System for GunPhysicsSystem {
-    fn update(&mut self, scene: &Scene, _delta: f32) {
-        let gun_animation_manager = scene.get_manager::<GunPhysicsManager>();
-        let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
-        let transform_manager = scene.get_manager::<TransformManager>();
+        rigidbody.linear_drag = 20.0;
+        rigidbody.angular_drag = 20.0;
 
-        for (mut gun_physics, entity) in gun_animation_manager.iter_mut() {
-            let mut rigidbody = rigidbody_manager.get_mut(entity).unwrap();
-            let transform = transform_manager.get(entity);
+        // Calculate the force based on the offset from equilibrium (the origin).
+        let offset = transform.position() - self.target_position;
+        let spring = -self.linear_spring * offset;
+        rigidbody.apply_force(spring);
 
-            // Override values for debug purposes.
-            gun_physics.spring_constant = 500.0;
-            gun_physics.angular_spring = 400.0;
-
-            rigidbody.linear_drag = 20.0;
-            rigidbody.angular_drag = 20.0;
-
-            // Calculate the force based on the offset from equilibrium (the origin).
-            let offset = transform.position().as_vector3();
-            let spring = -gun_physics.spring_constant * offset;
-            rigidbody.apply_force(spring);
-
-            // Calculate torque.
-            let angular_offset = transform.rotation().as_eulers();
-            let torque = -gun_physics.angular_spring * angular_offset;
-            rigidbody.apply_torque(torque);
-        }
+        // Calculate torque.
+        let offset = (transform.orientation() - self.target_orientation).as_eulers();
+        let torque = -self.angular_spring * offset;
+        rigidbody.apply_torque(torque);
     }
 }

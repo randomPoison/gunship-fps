@@ -1,19 +1,8 @@
 [package]
 
 name = "fps"
-version = "0.0.0"
+version = "0.1.0"
 authors = ["David LeGare <excaliburhissheath@gmail.com>"]
 
-[lib]
-name = "fps"
-crate-type = ["dylib", "rlib"]
-
 [dependencies]
-gunship = { version = "*", path = "gunship-rs", features = ["hotloading"] }
-# loader  = { version = "*", path = "../gunship-rs/lib/loader" }
-
-[profile.dev]
-opt-level = 0
-
-[profile.release]
-debug = true
+gunship = { path = "gunship-rs" }

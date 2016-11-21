@@ -1,5 +1,3 @@
-use gunship::*;
-
 #[derive(Debug, Clone, Copy)]
 pub struct Magazine {
     pub capacity: u32,
@@ -37,7 +35,7 @@ impl Gun {
     }
 
     pub fn fire(&mut self) {
-        self.magazine.as_mut().unwrap().rounds -= 1;
+        self.magazine.as_mut().expect("Can't fire without a magazine").rounds -= 1;
         self.is_cocked = false;
     }
 
@@ -51,5 +49,3 @@ impl Gun {
         self.is_cocked
     }
 }
-
-pub type GunManager = StructComponentManager<Gun>;

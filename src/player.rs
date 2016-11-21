@@ -1,161 +1,125 @@
-use std::f32::consts::PI;
-
-use gunship::*;
-use physics::*;
 use bullet::*;
 use gun::*;
-
-#[derive(Debug, Clone, Copy)]
-pub struct Player {
-    pub camera: Entity,
-    pub gun_entity: Entity,
-    pub bullet_offset: Vector3,
-    pub gun_alarm: Option<AlarmID>,
-}
-
-pub type PlayerManager = StructComponentManager<Player>;
-
-#[derive(Debug, Clone, Copy)]
-pub struct PlayerMoveSystem;
+use gunship::*;
+use gunship::input::*;
+use gunship::math::*;
+use gunship::resource::Mesh;
+use gunship::transform::Transform;
+use physics::*;
 
 const ACCELERATION: f32 = 50.0;
 const MAX_SPEED: f32 = 5.0;
 
-impl System for PlayerMoveSystem {
-    fn update(&mut self, scene: &Scene, delta: f32) {
-        let player_manager = scene.get_manager::<PlayerManager>();
-        for (mut player, root_entity) in player_manager.iter_mut() {
-            {
-                let mut alarm_manager = scene.get_manager_mut::<AlarmManager>();
-                if scene.input.key_down(ScanCode::W)
-                || scene.input.key_down(ScanCode::A)
-                || scene.input.key_down(ScanCode::S)
-                || scene.input.key_down(ScanCode::D) {
-                    if player.gun_alarm.is_none() {
-                        let alarm_id = alarm_manager.assign_repeating(player.gun_entity, 0.5, |scene, entity| {
-                            let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
+#[derive(Debug)]
+pub struct Player {
+    pub root_transform: Transform,
+    pub root_rigidbody: Rigidbody,
+    pub gun_transform: Transform,
+    pub gun_rigidbody: Rigidbody,
+    pub gun_physics: GunPhysics,
+    pub gun: Gun,
 
-                            let mut rigidbody = rigidbody_manager.get_mut(entity).unwrap();
-                            rigidbody.add_velocity(Vector3::new(0.0, -0.25, 0.0));
-                            rigidbody.add_angular_velocity(Vector3::new(-0.5 * PI, 0.0, 0.0));
-                        });
-                        player.gun_alarm = Some(alarm_id);
-                    }
-                } else if player.gun_alarm.is_some() {
-                    let alarm_id = player.gun_alarm.unwrap();
-                    alarm_manager.cancel(alarm_id);
-                    player.gun_alarm = None;
-                }
+    pub pitch: f32,
+    pub yaw: f32,
+    pub bullet_offset: Vector3,
+
+    pub bullet_mesh: Mesh,
+}
+
+impl Player {
+    pub fn update(&mut self) {
+        // Cache off the position and rotation and then drop the transform
+        // so that we don't have multiple borrows of transform_manager.
+        let (movement_x, movement_y) = input::mouse_delta();
+        self.yaw += (-movement_x as f32) * PI * 0.1 * time::delta_f32();
+        self.pitch += (-movement_y as f32) * PI * 0.1 * time::delta_f32();
+
+        // Set orientation by applying yaw first, then pitch. If we do both at once (e.g.
+        // `Orientation::from_eulers(pitch, yaw, 0.0)`) then pitch is applied first, which causes
+        // pitch to invert with the player turns around.
+        self.root_transform.set_orientation(
+            Orientation::from_eulers(0.0, self.yaw, 0.0) + Orientation::from_eulers(self.pitch, 0.0, 0.0),
+        );
+
+        // Handle movement through root entity.
+        {
+            let mut velocity = self.root_rigidbody.velocity();
+
+            // Calculate the forward and right vectors.
+            let forward_dir: Vector3 = self.root_transform.forward().set_y(0.0).normalized();
+            let right_dir = self.root_transform.right();
+
+            // Move camera based on input.
+            if input::key_down(ScanCode::W) {
+                velocity += forward_dir * time::delta_f32() * ACCELERATION;
             }
 
-            // Cache off the position and rotation and then drop the transform
-            // so that we don't have multiple borrows of transform_manager.
-            let (position, rotation) = {
-                let transform_manager = scene.get_manager::<TransformManager>();
-                let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
-
-                let (movement_x, movement_y) = scene.input.mouse_delta();
-
-                // Handle movement through root entity.
-                // The root entity handles all translation as well as rotation around the Y axis.
-                {
-                    let mut transform = transform_manager.get_mut(root_entity);
-                    let mut rigidbody = rigidbody_manager.get_mut(root_entity).unwrap();
-
-                    let rotation = transform.rotation();
-                    let mut velocity = rigidbody.velocity();
-
-                    transform.set_rotation(Quaternion::from_eulers(0.0, (-movement_x as f32) * PI * 0.001, 0.0) * rotation);
-
-                    // Calculate the forward and right vectors.
-                    let forward_dir = transform.forward();
-                    let right_dir   = transform.right();
-
-                    // Move camera based on input.
-                    if scene.input.key_down(ScanCode::W) {
-                        velocity = velocity + forward_dir * delta * ACCELERATION;
-                    }
-
-                    if scene.input.key_down(ScanCode::S) {
-                        velocity = velocity - forward_dir * delta * ACCELERATION;
-                    }
-
-                    if scene.input.key_down(ScanCode::D) {
-                        velocity = velocity + right_dir * delta * ACCELERATION;
-                    }
-
-                    if scene.input.key_down(ScanCode::A) {
-                        velocity = velocity - right_dir * delta * ACCELERATION;
-                    }
-
-                    if scene.input.key_down(ScanCode::E) {
-                        velocity = velocity + Vector3::up() * delta * ACCELERATION;
-                    }
-
-                    if scene.input.key_down(ScanCode::Q) {
-                        velocity = velocity + Vector3::down() * delta * ACCELERATION;
-                    }
-
-                    // Clamp the velocity to the maximum speed.
-                    if velocity.magnitude() > MAX_SPEED {
-                        velocity = velocity.normalized() * MAX_SPEED;
-                    }
-
-                    rigidbody.set_velocity(velocity);
-                };
-
-                {
-                    let mut camera_transform = transform_manager.get_mut(player.camera);
-                    let rotation = camera_transform.rotation();
-
-                    // Apply a rotation to the camera based on mouse movement.
-                    camera_transform.set_rotation(
-                        Quaternion::from_eulers((-movement_y as f32) * PI * 0.001, 0.0, 0.0)
-                      * rotation);
-                }
-
-                transform_manager.update_single(player.gun_entity);
-                let gun_transform = transform_manager.get(player.gun_entity);
-
-                (gun_transform.position_derived(), gun_transform.rotation_derived())
-            };
-
-            let rotation_matrix = Matrix3::from_quaternion(rotation);
-            let up_dir = rotation_matrix.y_part();
-            let right_dir = rotation_matrix.y_part();
-            let forward_dir = -rotation_matrix.z_part();
-
-            if scene.input.mouse_button_pressed(1) {
-                let gun_manager = scene.get_manager::<GunManager>();
-
-                let mut gun = gun_manager.get_mut(player.gun_entity).unwrap();
-                gun.pull_hammer();
+            if input::key_down(ScanCode::S) {
+                velocity -= forward_dir * time::delta_f32() * ACCELERATION;
             }
 
-            if scene.input.mouse_button_pressed(0) {
-                let audio_manager = scene.get_manager::<AudioSourceManager>();
-                let rigidbody_manager = scene.get_manager::<RigidbodyManager>();
-                let gun_manager = scene.get_manager::<GunManager>();
+            if input::key_down(ScanCode::D) {
+                velocity += right_dir * time::delta_f32() * ACCELERATION;
+            }
 
-                let mut gun = gun_manager.get_mut(player.gun_entity).unwrap();
-                if gun.can_fire() {
-                    gun.fire();
+            if input::key_down(ScanCode::A) {
+                velocity -= right_dir * time::delta_f32() * ACCELERATION;
+            }
 
-                    let mut audio_source = audio_manager.get_mut(player.gun_entity).unwrap();
-                    audio_source.reset();
-                    audio_source.play();
+            if input::key_down(ScanCode::E) {
+                velocity += Vector3::up() * time::delta_f32() * ACCELERATION;
+            }
 
-                    let bullet_pos = position
-                                   + (player.bullet_offset.x * right_dir)
-                                   + (player.bullet_offset.y * up_dir)
-                                   + (player.bullet_offset.z * forward_dir);
-                    Bullet::new(scene, bullet_pos, rotation);
+            if input::key_down(ScanCode::Q) {
+                velocity += Vector3::down() * time::delta_f32() * ACCELERATION;
+            }
 
-                    let mut rigidbody = rigidbody_manager.get_mut(player.gun_entity).unwrap();
-                    rigidbody.add_velocity(Vector3::new(0.0, 3.0, 10.0));
-                    rigidbody.add_angular_velocity(Vector3::new(15.0 * PI, -8.0 * PI, 5.0 * PI));
-                }
+            // Clamp the velocity to the maximum speed.
+            if velocity.magnitude() > MAX_SPEED {
+                velocity = velocity.normalized() * MAX_SPEED;
+            }
+
+            self.root_rigidbody.set_velocity(velocity);
+        };
+
+        let position = self.gun_transform.position();
+        let rotation = self.gun_transform.orientation();
+
+        let rotation_matrix = Matrix3::from(rotation);
+        let up_dir = rotation_matrix.y_part();
+        let right_dir = rotation_matrix.y_part();
+        let forward_dir = -rotation_matrix.z_part();
+
+        if input::mouse_button_pressed(1) {
+            self.gun.pull_hammer();
+        }
+
+        if input::mouse_button_pressed(0) {
+            if self.gun.can_fire() {
+                self.gun.fire();
+
+                // TODO: Play audio on gunshot.
+                // let mut audio_source = audio_manager.get_mut(player.gun_entity).unwrap();
+                // audio_source.reset();
+                // audio_source.play();
+
+                let bullet_pos = position
+                               + (self.bullet_offset.x * right_dir)
+                               + (self.bullet_offset.y * up_dir)
+                               + (self.bullet_offset.z * forward_dir);
+                let mut bullet = Bullet::new(&self.bullet_mesh, bullet_pos, rotation);
+                engine::run_each_frame(move || {
+                    bullet.update();
+                });
+
+                self.gun_rigidbody.add_velocity(Vector3::new(0.0, 3.0, 10.0));
+                self.gun_rigidbody.add_angular_velocity(Vector3::new(15.0 * PI, -8.0 * PI, 5.0 * PI));
             }
         }
+
+        self.root_rigidbody.update(&mut self.root_transform);
+        self.gun_physics.update_target(&self.root_transform);
+        self.gun_physics.update(&mut self.gun_rigidbody, &self.gun_transform);
+        self.gun_rigidbody.update(&mut self.gun_transform);
     }
 }
