@@ -26,6 +26,8 @@ pub fn main() {
 }
 
 fn setup_scene() {
+    input::set_capture(true);
+
     // Load all meshes for the game.
     let gun_mesh_task = resource::load_mesh("meshes/gun_small.dae");
     let cube_mesh_task = resource::load_mesh("meshes/cube.dae");
@@ -68,14 +70,6 @@ fn setup_scene() {
     root_rigidbody.mass = 70.0;
     root_rigidbody.linear_drag = 500.0;
 
-    mem::forget(camera);
-
-    // Create the player's gun.
-    let gun_transform = Transform::new();
-
-    let gun_mesh_renderer = MeshRenderer::new(&gun_mesh, &gun_transform);
-    mem::forget(gun_mesh_renderer);
-
     let gun_physics = GunPhysics {
         linear_spring: 500.0,
         angular_spring: 400.0,
@@ -84,27 +78,27 @@ fn setup_scene() {
 
         .. GunPhysics::default()
     };
-    let gun_rigidbody = Rigidbody::new();
-    let mut gun = Gun::new();
+    let mut gun = Gun::new(
+        &gun_mesh,
+        cube_mesh,
+        root_transform.position() + gun_physics.position_offset,
+        root_transform.orientation(),
+    );
     gun.insert_magazine(Magazine {
         capacity: 6,
         rounds: 6,
     });
 
     let mut player = Player {
-        root_transform: root_transform,
-        root_rigidbody: root_rigidbody,
+        camera: camera,
+        transform: root_transform,
+        rigidbody: root_rigidbody,
 
-        gun_transform: gun_transform,
-        gun_rigidbody: gun_rigidbody,
-        gun_physics: gun_physics,
         gun: gun,
+        gun_physics: gun_physics,
 
         pitch: 0.0,
         yaw: 0.0,
-        bullet_offset: Vector3::new(0.0, 0.04, 0.2),
-
-        bullet_mesh: cube_mesh,
     };
 
     engine::run_each_frame(move || {

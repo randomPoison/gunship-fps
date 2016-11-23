@@ -25,7 +25,7 @@ impl Bullet {
         Bullet {
             transform: transform,
             mesh_renderer: mesh_renderer,
-            speed: 10.0
+            speed: 100.0
         }
     }
 
