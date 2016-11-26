@@ -3,8 +3,11 @@ use gunship::*;
 use gunship::camera::Camera;
 use gunship::input::*;
 use gunship::math::*;
+use gunship::mesh_renderer::MeshRenderer;
+use gunship::resource::Mesh;
 use gunship::transform::Transform;
 use physics::*;
+use std::sync::Arc;
 
 const ACCELERATION: f32 = 50.0;
 const MAX_SPEED: f32 = 5.0;
@@ -15,11 +18,13 @@ pub struct Player {
     pub transform: Transform,
     pub rigidbody: Rigidbody,
 
-    pub gun: Gun,
+    pub gun: Revolver,
     pub gun_physics: GunPhysics,
 
     pub pitch: f32,
     pub yaw: f32,
+
+    pub cartridge_mesh: Arc<Mesh>,
 }
 
 impl Player {
@@ -84,15 +89,35 @@ impl Player {
         self.gun_physics.update(&mut self.gun.rigidbody, &self.gun.transform);
         self.gun.rigidbody.update(&mut self.gun.transform);
 
+        self.gun.rotate_cylinder(input::mouse_scroll() as isize);
+
+        if input::key_pressed(ScanCode::R) {
+            // Create the cartridge.
+            let mut cartridge_transform = Transform::new();
+            cartridge_transform.set_scale(Vector3::new(0.01, 0.01, 0.03));
+
+            let cartridge_renderer = MeshRenderer::new(&self.cartridge_mesh, &cartridge_transform);
+
+            // TODO: Animate cartridge being inserted.
+            // TODO: Animate failure when cartidge doesn't go in.
+            let _ = self.gun.load_cartridge(Cartridge {
+                transform: cartridge_transform,
+                mesh_renderer: cartridge_renderer,
+
+                has_fired: false,
+            });
+        }
+
         if input::mouse_button_pressed(1) {
             self.gun.pull_hammer();
         }
 
-        if input::mouse_button_pressed(0) && self.gun.can_fire() {
-            self.gun.fire();
-
+        if input::mouse_button_pressed(0) && self.gun.fire() {
+            // Apply kickback animation.
             self.gun.rigidbody.add_velocity(Vector3::new(0.0, 3.0, 10.0));
             self.gun.rigidbody.add_angular_velocity(Vector3::new(15.0 * PI, -8.0 * PI, 5.0 * PI));
         }
+
+        self.gun.update_transforms();
     }
 }

@@ -1,6 +1,5 @@
 extern crate gunship;
 
-pub mod bullet;
 pub mod physics;
 pub mod player;
 pub mod gun;
@@ -12,6 +11,7 @@ use gunship::transform::Transform;
 use gunship::mesh_renderer::MeshRenderer;
 use gunship::math::*;
 use std::mem;
+use std::sync::Arc;
 
 use self::physics::*;
 use self::player::*;
@@ -34,6 +34,8 @@ fn setup_scene() {
 
     let gun_mesh = gun_mesh_task.await().expect("Failed to load gun_small.dae");
     let cube_mesh = cube_mesh_task.await().expect("Failed to load cube.dae");
+
+    let cube_mesh = Arc::new(cube_mesh);
 
     // Create static gun and bullet meshes, used for points of reference when running around.
     // TODO: Create some kind of level with a floor and some walls and stuff, some kind of actual
@@ -78,16 +80,12 @@ fn setup_scene() {
 
         .. GunPhysics::default()
     };
-    let mut gun = Gun::new(
+    let gun = Revolver::new(
         &gun_mesh,
-        cube_mesh,
+        cube_mesh.clone(),
         root_transform.position() + gun_physics.position_offset,
         root_transform.orientation(),
     );
-    gun.insert_magazine(Magazine {
-        capacity: 6,
-        rounds: 6,
-    });
 
     let mut player = Player {
         camera: camera,
@@ -99,6 +97,8 @@ fn setup_scene() {
 
         pitch: 0.0,
         yaw: 0.0,
+
+        cartridge_mesh: cube_mesh.clone(),
     };
 
     engine::run_each_frame(move || {
