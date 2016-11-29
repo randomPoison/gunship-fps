@@ -1,3 +1,10 @@
+//! # Gunship First Person Shooter
+//!
+//! # TODO
+//!
+//! - Animate hammer pulling back.
+//! - Add a way to empty cartridges.
+
 extern crate gunship;
 
 pub mod physics;
@@ -7,6 +14,7 @@ pub mod gun;
 use gunship::*;
 use gunship::camera::Camera;
 use gunship::engine::*;
+use gunship::light::*;
 use gunship::transform::Transform;
 use gunship::mesh_renderer::MeshRenderer;
 use gunship::math::*;
@@ -62,6 +70,18 @@ fn setup_scene() {
         mem::forget(mesh_renderer);
     }
 
+    {
+        let light = DirectionalLight::new(
+            Vector3::new(1.0, -1.0, -1.0),
+            Color::rgb(1.0, 1.0, 1.0),
+            0.2,
+        );
+
+        // Make the mesh "static" by ensuring the destructor won't be run.
+        // TODO: Figure out a better way to keep track of static scene elements.
+        mem::forget(light);
+    }
+
     // Create camera.
     let mut root_transform = Transform::new();
     root_transform.set_position(Point::new(0.0, 0.0, 10.0));
@@ -82,6 +102,7 @@ fn setup_scene() {
     };
     let gun = Revolver::new(
         &gun_mesh,
+        &*cube_mesh,
         cube_mesh.clone(),
         root_transform.position() + gun_physics.position_offset,
         root_transform.orientation(),

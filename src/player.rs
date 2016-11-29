@@ -89,7 +89,9 @@ impl Player {
         self.gun_physics.update(&mut self.gun.rigidbody, &self.gun.transform);
         self.gun.rigidbody.update(&mut self.gun.transform);
 
-        self.gun.rotate_cylinder(input::mouse_scroll() as isize);
+        if input::mouse_scroll() != 0 {
+            self.gun.rotate_cylinder(input::mouse_scroll() as isize);
+        }
 
         if input::key_pressed(ScanCode::R) {
             // Create the cartridge.

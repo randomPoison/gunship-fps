@@ -54,15 +54,31 @@ impl Cylinder {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct CylinderTween {
+    time: f32,
+    target_time: f32,
+    end_pos: usize,
+
+    /// Either -1 or 1 to specify the direction of rotation.
+    direction: f32,
+}
+
 #[derive(Debug)]
 pub struct Revolver {
     pub transform: Transform,
     pub mesh_renderer: MeshRenderer,
     pub rigidbody: Rigidbody,
 
+    pub hammer_transform: Transform,
+    pub hammer_renderer: MeshRenderer,
+    hammer_offset: Vector3,
+    hammer_pivot: Vector3,
+
     cylinder: Cylinder,
     cylinder_offset: Vector3,
     cylinder_radius: f32,
+    cylinder_tween: Option<CylinderTween>,
 
     bullet_offset: Vector3, // TODO: Configure based on gun mesh.
     is_cocked: bool,
@@ -73,6 +89,7 @@ pub struct Revolver {
 impl Revolver {
     pub fn new(
         mesh: &Mesh,
+        hammer_mesh: &Mesh,
         bullet_mesh: Arc<Mesh>,
         start_pos: Point,
         start_orientation: Orientation,
@@ -83,14 +100,25 @@ impl Revolver {
         let mesh_renderer = MeshRenderer::new(&mesh, &transform);
         let rigidbody = Rigidbody::new();
 
+        let mut hammer_transform = Transform::new();
+        hammer_transform.set_position(start_pos + Vector3::new(0.0, 0.05, 0.05));
+        hammer_transform.set_scale(Vector3::new(0.005, 0.01, 0.01));
+        let hammer_renderer = MeshRenderer::new(&hammer_mesh, &hammer_transform);
+
         Revolver {
             transform: transform,
             mesh_renderer: mesh_renderer,
             rigidbody: rigidbody,
 
+            hammer_transform: hammer_transform,
+            hammer_renderer: hammer_renderer,
+            hammer_offset: Vector3::new(0.0, 0.05, 0.05),
+            hammer_pivot: Vector3::new(0.0, -0.025, -0.025),
+
             cylinder: Cylinder::new(6),
             cylinder_offset: Vector3::new(0.0, 0.05, 0.0),
             cylinder_radius: 0.03,
+            cylinder_tween: None,
 
             bullet_offset: Vector3::new(0.0, 0.04, 0.2),
             is_cocked: false,
@@ -126,8 +154,11 @@ impl Revolver {
                 });
 
                 // Empty the chartridge.
-                // TODO: Change cartridge mesh to empty cartridge.
                 cartridge.has_fired = true;
+
+                // TODO: Change cartridge mesh to empty cartridge.
+                let scale = cartridge.transform.scale().set_z(0.001);
+                cartridge.transform.set_scale(scale);
 
                 return true;
             }
@@ -137,14 +168,27 @@ impl Revolver {
     }
 
     pub fn pull_hammer(&mut self) {
-        // TODO: Animate hammer pulling back.
-        self.is_cocked = true;
+        if !self.is_cocked {
+            // TODO: Animate hammer pulling back.
+            self.is_cocked = true;
+
+            self.rotate_cylinder(1);
+        }
     }
 
     pub fn rotate_cylinder(&mut self, rotation: isize) {
-        // TODO: Animate rotating the cylinder.
-        let pos = self.cylinder.position as isize + rotation;
-        self.cylinder.position = pos.modulo(self.cylinder.capacity() as isize) as usize;
+        if let Some(tween) = self.cylinder_tween {
+            // TODO: What should we do when the cylinder is already rotating?
+        } else {
+            let pos = self.cylinder.position as isize + rotation;
+
+            self.cylinder_tween = Some(CylinderTween {
+                time: 0.0,
+                target_time: 0.1,
+                end_pos: pos.modulo(self.cylinder.capacity() as isize) as usize,
+                direction: rotation as f32 / (rotation as f32).abs(),
+            });
+        }
     }
 
     pub fn load_cartridge(&mut self, cartridge: Cartridge) -> Result<(), Cartridge> {
@@ -160,6 +204,23 @@ impl Revolver {
     }
 
     pub fn update_transforms(&mut self) {
+        let tween_offset = if let Some(mut tween) = self.cylinder_tween {
+            // Update tween time.
+            tween.time += time::delta_f32();
+
+            if tween.time > tween.target_time {
+                // Tween is done. We want to set the cylinder's position to the end position.
+                self.cylinder.position = tween.end_pos;
+                self.cylinder_tween = None;
+                0.0
+            } else {
+                self.cylinder_tween = Some(tween);
+                tween.time / tween.target_time * tween.direction
+            }
+        } else {
+            0.0
+        };
+
         let capacity = self.cylinder.capacity();
         let cylinder_position = self.cylinder.position;
         let oriented_offset = self.transform.orientation() * self.cylinder_offset;
@@ -169,7 +230,7 @@ impl Revolver {
             if let Some(cartridge) = cylinder.as_mut() {
                 let pos = (index as isize - cylinder_position as isize).modulo(capacity as isize);
 
-                let rotation = TAU / capacity as f32 * pos as f32;
+                let rotation = TAU / capacity as f32 * (pos as f32 - tween_offset);
                 let local_orientation = Orientation::from_eulers(0.0, 0.0, rotation);
 
                 let orientation = self.transform.orientation() + local_orientation;
@@ -179,6 +240,10 @@ impl Revolver {
                 cartridge.transform.set_position(cylinder_center + cartridge_up_offset);
             }
         }
+
+        let hammer_position = self.transform.position() + self.transform.orientation() * self.hammer_offset;
+        self.hammer_transform.set_position(hammer_position);
+        self.hammer_transform.set_orientation(self.transform.orientation());
     }
 }
 
