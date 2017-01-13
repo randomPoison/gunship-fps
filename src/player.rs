@@ -93,6 +93,10 @@ impl Player {
             self.gun.rotate_cylinder(input::mouse_scroll() as isize);
         }
 
+        if input::key_pressed(ScanCode::F) {
+            self.gun.rotate_cylinder(1);
+        }
+
         if input::key_pressed(ScanCode::R) {
             // Create the cartridge.
             let mut cartridge_transform = Transform::new();

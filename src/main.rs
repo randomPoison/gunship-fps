@@ -7,9 +7,10 @@
 
 extern crate gunship;
 
+pub mod gun;
 pub mod physics;
 pub mod player;
-pub mod gun;
+pub mod tween;
 
 use gunship::*;
 use gunship::camera::Camera;

@@ -5,6 +5,7 @@ use gunship::mesh_renderer::MeshRenderer;
 use gunship::resource::Mesh;
 use gunship::transform::Transform;
 use std::sync::Arc;
+use tween;
 
 /// Represents the cylinder of a revolver, tracking the contents of each cylinder.
 #[derive(Debug)]
@@ -184,7 +185,7 @@ impl Revolver {
 
             self.cylinder_tween = Some(CylinderTween {
                 time: 0.0,
-                target_time: 0.1,
+                target_time: 0.2,
                 end_pos: pos.modulo(self.cylinder.capacity() as isize) as usize,
                 direction: rotation as f32 / (rotation as f32).abs(),
             });
@@ -215,7 +216,7 @@ impl Revolver {
                 0.0
             } else {
                 self.cylinder_tween = Some(tween);
-                tween.time / tween.target_time * tween.direction
+                tween::ease_out_back(tween.time / tween.target_time) * tween.direction
             }
         } else {
             0.0
